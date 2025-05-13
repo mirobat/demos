@@ -6,6 +6,8 @@
 # Usage: install uv from https://docs.astral.sh/uv/, then simply
 # `uv run demo.py <cutset> <backup_bucket_name> <UI_password>`.
 # No need to set up a virtual env etc
+# For EC2 deployment, generate a self-signed key
+# openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -sha256 -days 3650 -nodes -subj "/C=XX/ST=StateName/L=CityName/O=CompanyName/OU=CompanySectionName/CN=CommonNameOrHostname"
 
 import gradio as gr
 import gzip
@@ -311,12 +313,15 @@ def get_app():
 def main(cutset_file: str, backup_bucket: str, password: Optional[str] = None):
     global CUTSET_PATH
     CUTSET_PATH = cutset_file
+    args = dict(server_name="0.0.0.0", server_port=7860, share=False)
     if password:
         # don't back up locally to avoid overwriting prod data
         BackupThread(backup_bucket).start()
-    auth = ('demo', password) if password else None
-    share = False if password is None else True
-    get_app().launch(server_name="0.0.0.0", share=share, auth=auth)
+        # use a password and an SSL cert
+        auth = ('demo', password) if password else None
+        get_app().launch(**args, auth=auth, ssl_keyfile='key.pem', ssl_certfile='cert.pem', ssl_verify=False)
+    else:
+        get_app().launch(**args)
 
 
 if __name__ == "__main__":
