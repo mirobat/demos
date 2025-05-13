@@ -1,0 +1,18 @@
+[Unit]
+Description=GradioInterface
+After=network.target
+
+[Service]
+Type=simple
+User=ec2-user
+WorkingDirectory=/home/ec2-user/demos
+ExecStart=/home/ec2-user/.local/bin/uv run demo.py cutset_eval_34080utt_10129NEs_31.3h_05_08_2025.jsonl.gz  mirobat-share --password demo
+Restart=on-failure
+RestartSec=10
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=gradio
+Environment="PATH=/usr/bin:/usr/local/bin:/home/ec2-user/.local/bin/uv"
+
+[Install]
+WantedBy=multi-user.target

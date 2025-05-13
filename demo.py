@@ -8,6 +8,15 @@
 # No need to set up a virtual env etc
 # For EC2 deployment, generate a self-signed key
 # openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -sha256 -days 3650 -nodes -subj "/C=XX/ST=StateName/L=CityName/O=CompanyName/OU=CompanySectionName/CN=CommonNameOrHostname"
+# edit service.txt to set a password
+# sudo cp service.txt /etc/systemd/system/gradio.service
+# sudo systemctl daemon-reload
+# sudo systemctl enable gradio
+# sudo systemctl start gradio
+# Then monitor the app:
+# sudo systemctl status gradio
+# or get logs
+# sudo journalctl -u gradio -f
 
 import gradio as gr
 import gzip
