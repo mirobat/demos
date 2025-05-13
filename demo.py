@@ -22,6 +22,7 @@ import gzip
 import os
 import random
 import threading
+from collections import defaultdict
 from pathlib import Path
 from time import sleep
 from typing import Optional
@@ -202,7 +203,12 @@ def save_recording(audio, utterance_id, utterance_data, **extras):
 class RecordingInterface:
     def __init__(self):
         self.current_utterance = None
-        self.utterance_count = 0
+        self.utterance_count = defaultdict(int)
+
+        meta = _load_metadata()
+        for entry in meta.values():
+            if 'user' in entry:
+                self.utterance_count[entry['user']] += 1
 
     def get_text(self):
         if self.current_utterance is None:
@@ -211,13 +217,18 @@ class RecordingInterface:
                 return "No more utterances available."
         return self.current_utterance['supervisions'][0]['text']
 
-    def skip(self):
+    def get_recording_count(self, request: gr.Request):
+        user = generate_fingerprint(request)
+        return self.utterance_count[user]
+
+    def skip(self, request: gr.Request):
+        user = generate_fingerprint(request)
         if self.current_utterance:
             remove_active_utterance(self.current_utterance['id'])
         self.current_utterance = get_next_utterance()
         if self.current_utterance is None:
-            return "No more utterances available.", None, self.utterance_count
-        return self.current_utterance['supervisions'][0]['text'], None, self.utterance_count
+            return "No more utterances available.", None, self.utterance_count[user]
+        return self.current_utterance['supervisions'][0]['text'], None, self.utterance_count[user]
 
     def save_and_next(self, audio, accent, request: gr.Request):
         user = generate_fingerprint(request)
@@ -226,17 +237,18 @@ class RecordingInterface:
             accent = ""
         if self.current_utterance and audio is not None:
             save_recording(audio, self.current_utterance['id'], self.current_utterance, accent=accent, user=user)
-            self.utterance_count += 1
+            self.utterance_count[user] += 1
             self.current_utterance = get_next_utterance()
             if self.current_utterance is None:
-                return "No more utterances available.", None, self.utterance_count
-            return self.current_utterance['supervisions'][0]['text'], None, self.utterance_count
-        return "Please record audio before saving.", None, self.utterance_count
+                return "No more utterances available.", None, self.utterance_count[user]
+            return self.current_utterance['supervisions'][0]['text'], None, self.utterance_count[user]
+        return "Please record audio before saving.", None, self.utterance_count[user]
 
-    def record_again(self):
+    def record_again(self, request: gr.Request):
+        user = generate_fingerprint(request)
         if self.current_utterance is None:
-            return "No current utterance.", None, self.utterance_count
-        return self.current_utterance['supervisions'][0]['text'], None, self.utterance_count
+            return "No current utterance.", None, self.utterance_count[user]
+        return self.current_utterance['supervisions'][0]['text'], None, self.utterance_count[user]
 
 
 def _load_metadata():
@@ -287,7 +299,7 @@ def get_app():
 
         accent = gr.Textbox(
             label="Your native language or accent type",
-            placeholder="English",
+            placeholder="eg English, Russian, etc",
             elem_id="accent"
         )
 
@@ -319,7 +331,11 @@ def get_app():
             "### Recordings completed: ",
             elem_id="counter"
         )
-        counter = gr.Number(value=0, label="", elem_id="counter")
+        counter = gr.Number(0, label="", elem_id="counter")
+
+        # on page load, identify the user and update the previous recording count. this can't be done above because
+        # gradio does not pass the request object to the function that's used to initialize the value of the fiel
+        app.load(fn=interface.get_recording_count, outputs=counter)
 
         skip_btn.click(
             interface.skip,
