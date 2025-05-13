@@ -18,19 +18,17 @@
 # or get logs
 # sudo journalctl -u gradio -f
 
-import gradio as gr
 import gzip
-import json
-import json
 import os
 import random
-import soundfile as sf
 import threading
-import typer
-from loguru import logger
 from pathlib import Path
 from time import sleep
 from typing import Optional
+
+import soundfile as sf
+import typer
+from loguru import logger
 
 cli_app = typer.Typer()
 
@@ -69,12 +67,9 @@ active_lock = threading.Lock()
 
 import gradio as gr
 import os
-import uuid
 import json
 import hashlib
-import time
-from datetime import datetime
-from typing import Dict, Any
+
 
 # Function to generate a unique user fingerprint
 def generate_fingerprint(request: gr.Request) -> str:
@@ -89,6 +84,7 @@ def generate_fingerprint(request: gr.Request) -> str:
     # Create a hash of the data
     fingerprint_str = json.dumps(fingerprint_data, sort_keys=True)
     return hashlib.sha256(fingerprint_str.encode()).hexdigest()[:16]
+
 
 class BackupThread(threading.Thread):
     def __init__(self, bucket):
@@ -276,22 +272,15 @@ def update_metadata(utterance_id, utterance_data, **extras):
         _save_metadata(metadata)
 
 
+def get_static_file(name):
+    with (Path('static') / name).open() as f:
+        return f.read()
+
+
 def get_app():
     interface = RecordingInterface()
 
-    with gr.Blocks(css="""
-        #instruction-box { margin-bottom: 20px; }
-        #sentence-label { font-size: 24px; font-weight: bold; }
-        #sentence-text { 
-            font-size: 48px !important; 
-            line-height: 1.5;
-            padding: 30px;
-            min-height: 150px;
-            background-color: #f8f9fa;
-            border-radius: 10px;
-        }
-        #counter { font-size: 18px; font-weight: bold; color: #2196F3; }
-    """) as app:
+    with gr.Blocks(css=get_static_file('demo.css')) as app:
         gr.Markdown(
             INSTRUCTIONS,
             elem_id="instruction-box"
