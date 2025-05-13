@@ -3,20 +3,21 @@
 # dependencies = ["gradio", "soundfile", "boto3", "loguru"]
 # ///
 # DO NOT MODIFY THE COMMENT ABOVE
-# Usage: install uv from https://docs.astral.sh/uv/, then simply `uv run demo.py`. No need to set up a virtual env
+# Usage: install uv from https://docs.astral.sh/uv/, then simply
+# `uv run demo.py <cutset> <backup_bucket_name> <UI_password>`.
+# No need to set up a virtual env etc
 
+import gradio as gr
 import gzip
 import json
 import os
 import random
-import threading
-from pathlib import Path
-from time import sleep
-
-import gradio as gr
 import soundfile as sf
+import threading
 import typer
 from loguru import logger
+from pathlib import Path
+from time import sleep
 
 # Constants
 CUTSET_PATH = None
@@ -28,7 +29,7 @@ BACKUP_DIR = Path('labelled_audio')
 
 # Instructions text
 INSTRUCTIONS = """
-Welcome to the AWS Transcribe audio recording interface!
+Welcome to the audio recording interface!
 
 Instructions:
 1. Read the sentence displayed below
@@ -37,6 +38,7 @@ Instructions:
 4. You can listen to your recording
 5. If you're satisfied, click 'Save and Next', otherwise 'Record Again'
 6. If you want to skip the current sentence, click 'Skip'
+7. Reach out to mirobat@ or alexnls@ for support
 """
 
 # Create directories if they don't exist
@@ -84,12 +86,13 @@ class BackupThread(threading.Thread):
 
 
 def load_cutset():
-    logger.info('Cutset path is', CUTSET_PATH)
+    logger.info(f'Cutset path is {CUTSET_PATH}')
     utterances = []
     with gzip.open(CUTSET_PATH, 'rt') as f:
         for line in f:
             utterance = json.loads(line)
             utterances.append(utterance)
+    logger.info("Found %d utterances", len(utterances))
     return utterances
 
 
@@ -268,12 +271,11 @@ def get_app():
     return app
 
 
-def main(cutset_file: str, backup_bucket: str):
-    print(cutset_file, backup_bucket)
+def main(cutset_file: str, backup_bucket: str, password: str):
     global CUTSET_PATH
     CUTSET_PATH = cutset_file
     BackupThread(backup_bucket).start()
-    get_app().launch(server_name="0.0.0.0", share=False)
+    get_app().launch(server_name="0.0.0.0", share=False, auth=('demo', password))
 
 
 if __name__ == "__main__":
