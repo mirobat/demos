@@ -50,13 +50,14 @@ INSTRUCTIONS = """
 Welcome to the audio recording interface!
 
 Instructions:
-1. Read the sentence displayed below
-2. Click the record button and speak clearly
-3. Click stop when you're done
-4. You can listen to your recording
-5. If you're satisfied, click 'Save and Next', otherwise 'Record Again'
-6. If you want to skip the current sentence, click 'Skip'
-7. Reach out to mirobat@ or alexnls@ for support
+1. Enter your native language or accent type in the box below (only used to study whether models underperform for specific accents)
+2. Read the sentence displayed below
+3. Click the record button and speak clearly
+4. Click stop when you're done
+5. You can listen to your recording
+6. If you're satisfied, click 'Save and Next', otherwise 'Record Again'
+7. If you want to skip the current sentence, click 'Skip'
+8. Reach out to mirobat@ or alexnls@ for support
 """
 
 # Create directories if they don't exist
@@ -160,7 +161,7 @@ def get_next_utterance():
     return utterance
 
 
-def save_recording(audio, utterance_id, utterance_data):
+def save_recording(audio, utterance_id, utterance_data, accent):
     if audio is None:
         return False
 
@@ -169,7 +170,7 @@ def save_recording(audio, utterance_id, utterance_data):
     sf.write(filename, audio[1], audio[0])
 
     # Then update metadata with thread safety
-    update_metadata(utterance_id, utterance_data)
+    update_metadata(utterance_id, utterance_data, accent)
 
     with recorded_lock:
         with open(RECORDED_LOG, 'a') as f:
@@ -199,9 +200,11 @@ class RecordingInterface:
             return "No more utterances available.", None, self.utterance_count
         return self.current_utterance['supervisions'][0]['text'], None, self.utterance_count
 
-    def save_and_next(self, audio):
+    def save_and_next(self, audio, accent):
+        if not accent:
+            accent = ""
         if self.current_utterance and audio is not None:
-            save_recording(audio, self.current_utterance['id'], self.current_utterance)
+            save_recording(audio, self.current_utterance['id'], self.current_utterance, accent)
             self.utterance_count += 1
             self.current_utterance = get_next_utterance()
             if self.current_utterance is None:
@@ -231,7 +234,7 @@ def _save_metadata(metadata):
         json.dump(metadata, f, indent=2, sort_keys=True)
 
 
-def update_metadata(utterance_id, utterance_data):
+def update_metadata(utterance_id, utterance_data, accent):
     with metadata_lock:
         # Load current metadata
         metadata = _load_metadata()
@@ -242,7 +245,8 @@ def update_metadata(utterance_id, utterance_data):
             "entity_text": utterance_data['supervisions'][0]['custom']['NE_text'],
             "entity_id": utterance_data['supervisions'][0]['custom']['NE_id'],
             "recording_id": utterance_id,
-            "engine": "human"
+            "engine": "human",
+            "accent": accent
         }
 
         # Save updated metadata
@@ -268,6 +272,12 @@ def get_app():
         gr.Markdown(
             INSTRUCTIONS,
             elem_id="instruction-box"
+        )
+
+        accent = gr.Textbox(
+            label="Your native language or accent type",
+            placeholder="English",
+            elem_id="accent"
         )
 
         gr.Markdown(
@@ -307,7 +317,7 @@ def get_app():
 
         save_btn.click(
             interface.save_and_next,
-            inputs=[audio],
+            inputs=[audio, accent],
             outputs=[text, audio, counter]
         )
 
