@@ -67,6 +67,28 @@ os.makedirs(RECORDINGS_DIR, exist_ok=True)
 recorded_lock = threading.Lock()
 active_lock = threading.Lock()
 
+import gradio as gr
+import os
+import uuid
+import json
+import hashlib
+import time
+from datetime import datetime
+from typing import Dict, Any
+
+# Function to generate a unique user fingerprint
+def generate_fingerprint(request: gr.Request) -> str:
+    """Generate a consistent fingerprint for a user based on request data."""
+    # Collect identifying information
+    fingerprint_data = {
+        "ip": request.client.host,
+        "user_agent": request.headers.get("User-Agent", ""),
+        "language": request.headers.get("Accept-Language", "")
+    }
+
+    # Create a hash of the data
+    fingerprint_str = json.dumps(fingerprint_data, sort_keys=True)
+    return hashlib.sha256(fingerprint_str.encode()).hexdigest()[:16]
 
 class BackupThread(threading.Thread):
     def __init__(self, bucket):
@@ -161,7 +183,7 @@ def get_next_utterance():
     return utterance
 
 
-def save_recording(audio, utterance_id, utterance_data, accent):
+def save_recording(audio, utterance_id, utterance_data, **extras):
     if audio is None:
         return False
 
@@ -170,7 +192,7 @@ def save_recording(audio, utterance_id, utterance_data, accent):
     sf.write(filename, audio[1], audio[0])
 
     # Then update metadata with thread safety
-    update_metadata(utterance_id, utterance_data, accent)
+    update_metadata(utterance_id, utterance_data, **extras)
 
     with recorded_lock:
         with open(RECORDED_LOG, 'a') as f:
@@ -200,11 +222,12 @@ class RecordingInterface:
             return "No more utterances available.", None, self.utterance_count
         return self.current_utterance['supervisions'][0]['text'], None, self.utterance_count
 
-    def save_and_next(self, audio, accent):
+    def save_and_next(self, audio, accent, request: gr.Request):
+        user = generate_fingerprint(request)
         if not accent:
             accent = ""
         if self.current_utterance and audio is not None:
-            save_recording(audio, self.current_utterance['id'], self.current_utterance, accent)
+            save_recording(audio, self.current_utterance['id'], self.current_utterance, accent=accent, user=user)
             self.utterance_count += 1
             self.current_utterance = get_next_utterance()
             if self.current_utterance is None:
@@ -234,7 +257,7 @@ def _save_metadata(metadata):
         json.dump(metadata, f, indent=2, sort_keys=True)
 
 
-def update_metadata(utterance_id, utterance_data, accent):
+def update_metadata(utterance_id, utterance_data, **extras):
     with metadata_lock:
         # Load current metadata
         metadata = _load_metadata()
@@ -246,7 +269,7 @@ def update_metadata(utterance_id, utterance_data, accent):
             "entity_id": utterance_data['supervisions'][0]['custom']['NE_id'],
             "recording_id": utterance_id,
             "engine": "human",
-            "accent": accent
+            **extras
         }
 
         # Save updated metadata
