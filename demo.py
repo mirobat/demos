@@ -311,7 +311,9 @@ def get_app():
 def main(cutset_file: str, backup_bucket: str, password: Optional[str] = None):
     global CUTSET_PATH
     CUTSET_PATH = cutset_file
-    BackupThread(backup_bucket).start()
+    if password:
+        # don't back up locally to avoid overwriting prod data
+        BackupThread(backup_bucket).start()
     auth = ('demo', password) if password else None
     share = False if password is None else True
     get_app().launch(server_name="0.0.0.0", share=share, auth=auth)
