@@ -33,7 +33,7 @@ from loguru import logger
 cli_app = typer.Typer()
 
 # Constants
-CUTSET_PATH = None
+UTTERANCES = []
 RECORDINGS_DIR = 'recordings'
 RECORDED_LOG = 'recorded_utterances.txt'
 ACTIVE_UTTERANCES_FILE = 'active_utterances.txt'
@@ -122,15 +122,17 @@ class BackupThread(threading.Thread):
             sleep(30)
 
 
-def load_cutset():
-    logger.info(f'Cutset path is {CUTSET_PATH}')
+def load_cutset(cutset_path):
+    logger.info(f'Cutset path is {cutset_path}')
     utterances = []
-    with gzip.open(CUTSET_PATH, 'rt') as f:
+    with gzip.open(cutset_path, 'rt') as f:
         for line in f:
             utterance = json.loads(line)
             utterances.append(utterance)
     logger.info(f"Found {len(utterances)} utterances")
-    return utterances
+
+    global UTTERANCES
+    UTTERANCES = utterances
 
 
 def get_recorded_utterances():
@@ -163,11 +165,10 @@ def remove_active_utterance(utterance_id):
 
 
 def get_next_utterance():
-    utterances = load_cutset()
     recorded = get_recorded_utterances()
     active = get_active_utterances()
 
-    available = [u for u in utterances
+    available = [u for u in UTTERANCES
                  if u['id'] not in recorded
                  and u['id'] not in active]
 
@@ -220,6 +221,7 @@ class RecordingInterface:
 
     def save_and_next(self, audio, accent, request: gr.Request):
         user = generate_fingerprint(request)
+        logger.info(f'Saving a file from user {user}')
         if not accent:
             accent = ""
         if self.current_utterance and audio is not None:
@@ -235,9 +237,6 @@ class RecordingInterface:
         if self.current_utterance is None:
             return "No current utterance.", None, self.utterance_count
         return self.current_utterance['supervisions'][0]['text'], None, self.utterance_count
-
-    def cancel(self):
-        return None
 
 
 def _load_metadata():
@@ -342,8 +341,7 @@ def get_app():
 
 @cli_app.command()
 def main(cutset_file: str, backup_bucket: str, password: Optional[str] = None):
-    global CUTSET_PATH
-    CUTSET_PATH = cutset_file
+    load_cutset(cutset_file)
     args = dict(server_name="0.0.0.0", server_port=7860, share=False)
     if password:
         # don't back up locally to avoid overwriting prod data
