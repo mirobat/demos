@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["gradio", "soundfile", "boto3", "loguru"]
+# dependencies = ["gradio", "soundfile", "boto3", "loguru", "typer"]
 # ///
 # DO NOT MODIFY THE COMMENT ABOVE
 # Usage: install uv from https://docs.astral.sh/uv/, then simply
@@ -10,6 +10,7 @@
 import gradio as gr
 import gzip
 import json
+import json
 import os
 import random
 import soundfile as sf
@@ -18,6 +19,9 @@ import typer
 from loguru import logger
 from pathlib import Path
 from time import sleep
+from typing import Optional
+
+cli_app = typer.Typer()
 
 # Constants
 CUTSET_PATH = None
@@ -26,6 +30,9 @@ RECORDED_LOG = 'recorded_utterances.txt'
 ACTIVE_UTTERANCES_FILE = 'active_utterances.txt'
 
 BACKUP_DIR = Path('labelled_audio')
+# Add this to your constants at the top
+METADATA_FILE = 'metadata.json'
+metadata_lock = threading.Lock()  # Add this with your other locks
 
 # Instructions text
 INSTRUCTIONS = """
@@ -53,7 +60,7 @@ class BackupThread(threading.Thread):
     def __init__(self, bucket):
         super().__init__()
         self.bucket = bucket
-        self.files = [ACTIVE_UTTERANCES_FILE, RECORDED_LOG]
+        self.files = [ACTIVE_UTTERANCES_FILE, RECORDED_LOG, METADATA_FILE]
         self.directories = [RECORDINGS_DIR]
 
     def _backup(self):
@@ -92,7 +99,7 @@ def load_cutset():
         for line in f:
             utterance = json.loads(line)
             utterances.append(utterance)
-    logger.info("Found %d utterances", len(utterances))
+    logger.info(f"Found {len(utterances)} utterances")
     return utterances
 
 
@@ -142,12 +149,16 @@ def get_next_utterance():
     return utterance
 
 
-def save_recording(audio, utterance_id):
+def save_recording(audio, utterance_id, utterance_data):
     if audio is None:
         return False
 
+    # First save the audio file
     filename = os.path.join(RECORDINGS_DIR, f"{utterance_id}.wav")
     sf.write(filename, audio[1], audio[0])
+
+    # Then update metadata with thread safety
+    update_metadata(utterance_id, utterance_data)
 
     with recorded_lock:
         with open(RECORDED_LOG, 'a') as f:
@@ -179,7 +190,7 @@ class RecordingInterface:
 
     def save_and_next(self, audio):
         if self.current_utterance and audio is not None:
-            save_recording(audio, self.current_utterance['id'])
+            save_recording(audio, self.current_utterance['id'], self.current_utterance)
             self.utterance_count += 1
             self.current_utterance = get_next_utterance()
             if self.current_utterance is None:
@@ -194,6 +205,37 @@ class RecordingInterface:
 
     def cancel(self):
         return None
+
+
+def _load_metadata():
+    try:
+        with open(METADATA_FILE, 'r') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def _save_metadata(metadata):
+    with open(METADATA_FILE, 'w') as f:
+        json.dump(metadata, f, indent=2, sort_keys=True)
+
+
+def update_metadata(utterance_id, utterance_data):
+    with metadata_lock:
+        # Load current metadata
+        metadata = _load_metadata()
+
+        # Create metadata entry
+        metadata[f"{utterance_id}.wav"] = {
+            "sentence_text": utterance_data['supervisions'][0]['text'],
+            "entity_text": utterance_data['supervisions'][0]['custom']['NE_text'],
+            "entity_id": utterance_data['supervisions'][0]['custom']['NE_id'],
+            "recording_id": utterance_id,
+            "engine": "human"
+        }
+
+        # Save updated metadata
+        _save_metadata(metadata)
 
 
 def get_app():
@@ -237,10 +279,9 @@ def get_app():
         )
 
         with gr.Row():
-            skip_btn = gr.Button("Skip")
             save_btn = gr.Button("Save and Next")
-            cancel_btn = gr.Button("Cancel")
-            again_btn = gr.Button("Record Again")
+            again_btn = gr.Button("Cancel and Record Again")
+            skip_btn = gr.Button("Skip")
 
         gr.Markdown(
             "### Recordings completed: ",
@@ -259,11 +300,6 @@ def get_app():
             outputs=[text, audio, counter]
         )
 
-        cancel_btn.click(
-            interface.cancel,
-            outputs=[audio]
-        )
-
         again_btn.click(
             interface.record_again,
             outputs=[text, audio, counter]
@@ -271,12 +307,15 @@ def get_app():
     return app
 
 
-def main(cutset_file: str, backup_bucket: str, password: str):
+@cli_app.command()
+def main(cutset_file: str, backup_bucket: str, password: Optional[str] = None):
     global CUTSET_PATH
     CUTSET_PATH = cutset_file
     BackupThread(backup_bucket).start()
-    get_app().launch(server_name="0.0.0.0", share=False, auth=('demo', password))
+    auth = ('demo', password) if password else None
+    share = False if password is None else True
+    get_app().launch(server_name="0.0.0.0", share=share, auth=auth)
 
 
 if __name__ == "__main__":
-    typer.run(main)
+    cli_app()
