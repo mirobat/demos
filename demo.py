@@ -65,7 +65,6 @@ import json
 import hashlib
 
 
-# Function to generate a unique user fingerprint
 def generate_fingerprint(request: gr.Request) -> str:
     """Generate a consistent fingerprint for a user based on request data."""
     # Collect identifying information
@@ -75,7 +74,6 @@ def generate_fingerprint(request: gr.Request) -> str:
         "language": request.headers.get("Accept-Language", "")
     }
 
-    # Create a hash of the data
     browser = ''
     if IS_LOCAL_DEV:
         if 'Firefox/' in fingerprint_data['user_agent']:
@@ -181,8 +179,8 @@ def save_recording(audio, utterance_id, utterance_data, **extras):
     if audio is None:
         return False
 
-    # First save the audio file
-    filename = os.path.join(RECORDINGS_DIR, f"{utterance_id}.wav")
+    user = extras.get("user", "user")
+    filename = os.path.join(RECORDINGS_DIR, f"{utterance_id}_{user}.wav")
     sf.write(filename, audio[1], audio[0])
 
     # Then update metadata with thread safety
