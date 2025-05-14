@@ -119,7 +119,7 @@ class BackupThread(threading.Thread):
         while True:
             logger.info(f'backing up data to {self.bucket}')
             self._backup()
-            sleep(30)
+            sleep(180)
 
 
 def load_cutset(cutset_path):
