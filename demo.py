@@ -31,18 +31,14 @@ import soundfile as sf
 import typer
 from loguru import logger
 
-cli_app = typer.Typer()
-
 # Constants
 UTTERANCES = []
 RECORDINGS_DIR = 'recordings'
-RECORDED_LOG = 'recorded_utterances.txt'
 ACTIVE_UTTERANCES_FILE = 'active_utterances.txt'
-
+IS_LOCAL_DEV = False
 BACKUP_DIR = Path('labelled_audio')
-# Add this to your constants at the top
 METADATA_FILE = 'metadata.json'
-metadata_lock = threading.Lock()  # Add this with your other locks
+metadata_lock = threading.Lock()
 
 # Instructions text
 INSTRUCTIONS = """
@@ -59,11 +55,8 @@ Instructions:
 8. Reach out to mirobat@ or alexnls@ for support
 """
 
-# Create directories if they don't exist
 os.makedirs(RECORDINGS_DIR, exist_ok=True)
 
-# Thread-safe locks
-recorded_lock = threading.Lock()
 active_lock = threading.Lock()
 
 import gradio as gr
@@ -83,15 +76,21 @@ def generate_fingerprint(request: gr.Request) -> str:
     }
 
     # Create a hash of the data
+    browser = ''
+    if IS_LOCAL_DEV:
+        if 'Firefox/' in fingerprint_data['user_agent']:
+            browser = 'Firefox'
+        elif 'Safari/' in fingerprint_data['user_agent']:
+            browser = 'Safari'
     fingerprint_str = json.dumps(fingerprint_data, sort_keys=True)
-    return hashlib.sha256(fingerprint_str.encode()).hexdigest()[:16]
+    return hashlib.sha256(fingerprint_str.encode()).hexdigest()[:16] + browser
 
 
 class BackupThread(threading.Thread):
     def __init__(self, bucket):
         super().__init__()
         self.bucket = bucket
-        self.files = [ACTIVE_UTTERANCES_FILE, RECORDED_LOG, METADATA_FILE]
+        self.files = [ACTIVE_UTTERANCES_FILE, METADATA_FILE]
         self.directories = [RECORDINGS_DIR]
 
     def _backup(self):
@@ -137,10 +136,7 @@ def load_cutset(cutset_path):
 
 
 def get_recorded_utterances():
-    if not os.path.exists(RECORDED_LOG):
-        return set()
-    with open(RECORDED_LOG, 'r') as f:
-        return set(line.strip() for line in f)
+    return set(load_metadata().keys())
 
 
 def get_active_utterances():
@@ -192,83 +188,92 @@ def save_recording(audio, utterance_id, utterance_data, **extras):
     # Then update metadata with thread safety
     update_metadata(utterance_id, utterance_data, **extras)
 
-    with recorded_lock:
-        with open(RECORDED_LOG, 'a') as f:
-            f.write(f"{utterance_id}\n")
-
     remove_active_utterance(utterance_id)
     return True
 
 
 class RecordingInterface:
     def __init__(self):
-        self.current_utterance = None
-        self.utterance_count = defaultdict(int)
+        self.current_utterance = defaultdict(dict)  # user ID -> dict containing a cutset utterance (itself a dict)
+        self.utterance_count = defaultdict(int)  # user ID -> integer
 
-        meta = _load_metadata()
+        meta = load_metadata()
         for entry in meta.values():
             if 'user' in entry:
                 self.utterance_count[entry['user']] += 1
+        logger.info(f'Found metadata for {len(meta)} files from {len(self.utterance_count)} users')
+        # clear active utterances on startup
+        if os.path.exists(ACTIVE_UTTERANCES_FILE):
+            with open(ACTIVE_UTTERANCES_FILE, 'w') as f:
+                f.write('')
 
-    def get_text(self):
-        if self.current_utterance is None:
-            self.current_utterance = get_next_utterance()
-            if self.current_utterance is None:
+    def get_text(self, request: gr.Request):
+        user = generate_fingerprint(request)
+        if not self.current_utterance[user]:
+            self.current_utterance[user] = get_next_utterance()
+            if not self.current_utterance[user]:
                 return "No more utterances available."
-        return self.current_utterance['supervisions'][0]['text']
+
+        txt = self.current_utterance[user]['supervisions'][0]['text']
+        logger.info(f'Getting text {txt} for user {user}')
+        return txt
 
     def get_recording_count(self, request: gr.Request):
         user = generate_fingerprint(request)
         return self.utterance_count[user]
 
+    def _init(self, request: gr.Request):
+        return self.get_recording_count(request), self.get_text(request)
+
     def skip(self, request: gr.Request):
         user = generate_fingerprint(request)
-        if self.current_utterance:
-            remove_active_utterance(self.current_utterance['id'])
-        self.current_utterance = get_next_utterance()
-        if self.current_utterance is None:
+        if self.current_utterance[user]:
+            remove_active_utterance(self.current_utterance[user]['id'])
+        self.current_utterance[user] = get_next_utterance()
+        if not self.current_utterance[user]:
             return "No more utterances available.", None, self.utterance_count[user]
-        return self.current_utterance['supervisions'][0]['text'], None, self.utterance_count[user]
+        return self.current_utterance[user]['supervisions'][0]['text'], None, self.utterance_count[user]
 
     def save_and_next(self, audio, accent, request: gr.Request):
         user = generate_fingerprint(request)
         logger.info(f'Saving a file from user {user}')
         if not accent:
             accent = ""
-        if self.current_utterance and audio is not None:
-            save_recording(audio, self.current_utterance['id'], self.current_utterance, accent=accent, user=user)
+        if self.current_utterance[user] and audio is not None:
+            save_recording(audio, self.current_utterance[user]['id'], self.current_utterance[user], accent=accent,
+                           user=user)
             self.utterance_count[user] += 1
-            self.current_utterance = get_next_utterance()
-            if self.current_utterance is None:
+            self.current_utterance[user] = get_next_utterance()
+            if not self.current_utterance[user]:
                 return "No more utterances available.", None, self.utterance_count[user]
-            return self.current_utterance['supervisions'][0]['text'], None, self.utterance_count[user]
+            return self.current_utterance[user]['supervisions'][0]['text'], None, self.utterance_count[user]
         return "Please record audio before saving.", None, self.utterance_count[user]
 
     def record_again(self, request: gr.Request):
         user = generate_fingerprint(request)
-        if self.current_utterance is None:
+        if not self.current_utterance[user]:
             return "No current utterance.", None, self.utterance_count[user]
-        return self.current_utterance['supervisions'][0]['text'], None, self.utterance_count[user]
+        return self.current_utterance[user]['supervisions'][0]['text'], None, self.utterance_count[user]
 
 
-def _load_metadata():
-    try:
-        with open(METADATA_FILE, 'r') as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
+def load_metadata():
+    with metadata_lock:
+        try:
+            with open(METADATA_FILE, 'r') as f:
+                return json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return {}
 
 
-def _save_metadata(metadata):
-    with open(METADATA_FILE, 'w') as f:
-        json.dump(metadata, f, indent=2, sort_keys=True)
+def save_metadata(metadata):
+    with metadata_lock:
+        with open(METADATA_FILE, 'w') as f:
+            json.dump(metadata, f, indent=2, sort_keys=True)
 
 
 def update_metadata(utterance_id, utterance_data, **extras):
+    metadata = load_metadata()
     with metadata_lock:
-        # Load current metadata
-        metadata = _load_metadata()
-
         # Create metadata entry
         metadata[f"{utterance_id}.wav"] = {
             "sentence_text": utterance_data['supervisions'][0]['text'],
@@ -279,8 +284,7 @@ def update_metadata(utterance_id, utterance_data, **extras):
             **extras
         }
 
-        # Save updated metadata
-        _save_metadata(metadata)
+    save_metadata(metadata)
 
 
 def get_static_file(name):
@@ -309,7 +313,7 @@ def get_app():
         )
         text = gr.Textbox(
             label="",
-            value=interface.get_text,
+            value='Loading....',
             elem_id="sentence-text",
             container=False,  # Removes the container border
             scale=3  # Makes the textbox larger
@@ -335,7 +339,7 @@ def get_app():
 
         # on page load, identify the user and update the previous recording count. this can't be done above because
         # gradio does not pass the request object to the function that's used to initialize the value of the fiel
-        app.load(fn=interface.get_recording_count, outputs=counter)
+        app.load(fn=interface._init, outputs=[counter, text])
 
         skip_btn.click(
             interface.skip,
@@ -355,19 +359,23 @@ def get_app():
     return app
 
 
-@cli_app.command()
 def main(cutset_file: str, backup_bucket: str, password: Optional[str] = None):
     load_cutset(cutset_file)
     args = dict(server_name="0.0.0.0", server_port=7860, share=False)
-    if password:
+
+    global IS_LOCAL_DEV
+    IS_LOCAL_DEV = (password is None)
+
+    if not IS_LOCAL_DEV:
         # don't back up locally to avoid overwriting prod data
         BackupThread(backup_bucket).start()
         # use a password and an SSL cert
-        auth = ('demo', password) if password else None
+        auth = ('demo', password)
         get_app().launch(**args, auth=auth, ssl_keyfile='key.pem', ssl_certfile='cert.pem', ssl_verify=False)
     else:
+        logger.info('Starting in local mode')
         get_app().launch(**args)
 
 
 if __name__ == "__main__":
-    cli_app()
+    typer.run(main)
