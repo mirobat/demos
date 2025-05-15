@@ -245,7 +245,8 @@ class RecordingInterface:
             if not self.current_utterance[user]:
                 return "No more utterances available.", None, self.utterance_count[user]
             return self.current_utterance[user]['supervisions'][0]['text'], None, self.utterance_count[user]
-        return "Please record audio before saving.", None, self.utterance_count[user]
+        logger.error(f"Got to a bad place, {user}, {self.current_utterance[user]}, {audio is None})")
+        return "Please record audio before saving.", None, self.utterance_count[user] # TODO should never hit here
 
     def record_again(self, request: gr.Request):
         user = generate_fingerprint(request)
