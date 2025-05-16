@@ -252,7 +252,7 @@ class RecordingInterface:
                 return "No more utterances available.", None, self.utterance_count[user]
             return self.current_utterance[user]['supervisions'][0]['text'], None, self.utterance_count[user]
         logger.error(f"Got to a bad place, {user}, {self.current_utterance[user]}, {audio is None})")
-        return "Please record audio before saving.", None, self.utterance_count[user] # TODO should never hit here
+        return "Please record audio before saving.", None, self.utterance_count[user]  # TODO should never hit here
 
     def record_again(self, request: gr.Request):
         user = generate_fingerprint(request)
@@ -297,6 +297,11 @@ def get_static_file(name):
         return f.read()
 
 
+def check_audio_recorded(audio):
+    visible = audio is not None
+    return gr.update(visible=visible), gr.update(visible=visible)
+
+
 def get_app():
     interface = RecordingInterface()
 
@@ -331,16 +336,27 @@ def get_app():
             interactive=True
         )
 
-        with gr.Row():
-            save_btn = gr.Button("Save and Next")
-            again_btn = gr.Button("Cancel and Record Again")
-            skip_btn = gr.Button("Skip")
+        with gr.Row(elem_classes="button-grid"):
+            with gr.Column():
+                save_btn = gr.Button("Save and Next", visible=False)
+                gr.HTML('<div class="empty-space"></div>', visible=lambda: not save_btn.visible)
+            with gr.Column():
+                again_btn = gr.Button("Cancel and Record Again", visible=False)
+                gr.HTML('<div class="empty-space"></div>', visible=lambda: not save_btn.visible)
+            with gr.Column():
+                skip_btn = gr.Button("Skip")
 
         gr.Markdown(
             "### Recordings completed: ",
-            elem_id="counter"
+            elem_id="counterLabel"
         )
         counter = gr.Number(0, label="", elem_id="counter")
+
+        audio.change(
+            fn=check_audio_recorded,
+            inputs=[audio],
+            outputs=[save_btn, again_btn]
+        )
 
         # on page load, identify the user and update the previous recording count. this can't be done above because
         # gradio does not pass the request object to the function that's used to initialize the value of the fiel
