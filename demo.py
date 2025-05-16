@@ -52,7 +52,7 @@ Instructions:
 5. You can listen to your recording.
 6. If you're satisfied, click 'Save and Next', otherwise 'Record Again'.
 7. If you want to skip the current sentence, click 'Skip'.
-8. If you run into any issues, reload the page first. Reach out to mirobat@ or alexnls@ for support.
+8. If you run into any issues, **reload the page first**. Reach out to mirobat@ or alexnls@ for support.
 """
 
 os.makedirs(RECORDINGS_DIR, exist_ok=True)
