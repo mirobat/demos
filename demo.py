@@ -305,7 +305,9 @@ def check_audio_recorded(audio):
 def get_app():
     interface = RecordingInterface()
 
-    with gr.Blocks(css=get_static_file('demo.css'), theme=gr.themes.Ocean()) as app:
+    with gr.Blocks(css=get_static_file('demo.css'),
+                   head=get_static_file('head.html'),
+                   theme=gr.themes.Ocean()) as app:
         gr.Markdown(
             INSTRUCTIONS,
             elem_id="instruction-box"
