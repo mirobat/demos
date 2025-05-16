@@ -17,7 +17,7 @@
 # sudo systemctl status gradio
 # or get logs
 # sudo journalctl -u gradio -f
-
+from datetime import datetime, timezone
 import gzip
 import os
 import random
@@ -244,8 +244,9 @@ class RecordingInterface:
         if not accent:
             accent = ""
         if self.current_utterance[user] and audio is not None:
+            now = datetime.now(timezone.utc).isoformat()
             save_recording(audio, self.current_utterance[user]['id'], self.current_utterance[user], accent=accent,
-                           user=user)
+                           user=user, recorded_at=now)
             self.utterance_count[user] += 1
             self.current_utterance[user] = get_next_utterance()
             if not self.current_utterance[user]:
