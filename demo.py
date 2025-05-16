@@ -340,7 +340,7 @@ def get_app():
 
         with gr.Row(elem_classes="button-grid"):
             with gr.Column():
-                save_btn = gr.Button("Save and Next", visible=False)
+                save_btn = gr.Button("Save and Next", visible=False, variant="primary")
                 gr.HTML('<div class="empty-space"></div>', visible=lambda: not save_btn.visible)
             with gr.Column():
                 again_btn = gr.Button("Cancel and Record Again", visible=False)
