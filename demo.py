@@ -81,6 +81,9 @@ def generate_fingerprint(request: gr.Request) -> str:
         elif 'Safari/' in fingerprint_data['user_agent']:
             browser = 'Safari'
     fingerprint_str = json.dumps(fingerprint_data, sort_keys=True)
+
+    cookie_ = request.headers.get('cookie', '')
+    print(hashlib.sha256(cookie_.encode()).hexdigest()[:16])
     return hashlib.sha256(fingerprint_str.encode()).hexdigest()[:16] + browser
 
 
@@ -234,6 +237,9 @@ class RecordingInterface:
 
     def save_and_next(self, audio, accent, request: gr.Request):
         user = generate_fingerprint(request)
+        if audio is None:
+            logger.info('skipping loop')
+            return self.current_utterance[user]['supervisions'][0]['text'], None, self.utterance_count[user]
         logger.info(f'Saving a file from user {user}')
         if not accent:
             accent = ""
@@ -294,7 +300,7 @@ def get_static_file(name):
 def get_app():
     interface = RecordingInterface()
 
-    with gr.Blocks(css=get_static_file('demo.css')) as app:
+    with gr.Blocks(css=get_static_file('demo.css'), theme=gr.themes.Ocean()) as app:
         gr.Markdown(
             INSTRUCTIONS,
             elem_id="instruction-box"
@@ -310,12 +316,12 @@ def get_app():
             "### Please read this sentence:",
             elem_id="sentence-label"
         )
-        text = gr.Textbox(
+        text = gr.Markdown(
             label="",
             value='Loading....',
             elem_id="sentence-text",
-            container=False,  # Removes the container border
-            scale=3  # Makes the textbox larger
+            # container=False,  # Removes the container border
+            # scale=5  # Makes the textbox larger
         )
 
         audio = gr.Audio(
@@ -377,4 +383,5 @@ def main(cutset_file: str, backup_bucket: str, password: Optional[str] = None):
 
 
 if __name__ == "__main__":
+    print(gr.__version__)
     typer.run(main)

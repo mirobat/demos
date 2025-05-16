@@ -5,11 +5,17 @@
     line-height: 1.5;
     padding: 30px;
     min-height: 150px;
-    background-color: #f8f9fa;
     border-radius: 10px;
 }
-#counter { font-size: 18px; font-weight: bold; color: #2196F3; }
+
+#sentence-text p{
+    font-size: large;
+}
 
 .controls .settings-wrapper {
     display: none;
+}
+
+footer, button.rewind, button.skip, button.volume, button.playback {
+    display: none !important
 }
