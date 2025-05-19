@@ -48,7 +48,7 @@ Instructions:
 1. Enter your native language or accent type in the box below (only used to study whether models underperform for specific accents)
 2. Read the sentence displayed below. If unsure how to pronounce any word, skip the sentence.
 3. Click the record button and speak clearly. It's best to pronounce the sentence in your mind once so you don't pause to think while recording.
-4. Click stop when you're done. A 'Save and Next' button will appear shortly.
+4. Click stop when you're done speaking. A 'Save and Next' button will appear shortly. After the button appears, you may need to wait for a few seconds until the audio widget is reloaded. **Do not** click Save until the audio widget has reloaded.
 5. You can listen to your recording.
 6. If you're satisfied, click 'Save and Next', otherwise 'Record Again'.
 7. If you want to skip the current sentence, click 'Skip'.
