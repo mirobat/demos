@@ -31,7 +31,7 @@ UTTERANCES = []
 RECORDINGS_DIR = 'recordings'
 ACTIVE_UTTERANCES_FILE = 'active_utterances.txt'
 IS_LOCAL_DEV = False
-BACKUP_DIR = Path('labelled_audio')
+BACKUP_DIR = Path('labelled_audio_v2')
 METADATA_FILE = 'metadata.json'
 metadata_lock = threading.Lock()
 
