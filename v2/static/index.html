@@ -47,19 +47,19 @@
                 <button
                     x-text="isRecording ? 'Skip' : 'Skip'"
                     @click="skip()"
-                    :disabled="hasRecording && !isRecording">
+                    :disabled="isRecording">
                 </button>
             </div>
             <div class="recording-indicator" x-show="isRecording">
-                Recording...
+                <span class="recording-dots"> </span>
             </div>
 
             <div class="audio-preview" x-show="hasRecording">
                 <h3>Recording Preview:</h3>
                 <audio x-ref="audioPlayer" controls></audio>
                 <div class="preview-controls">
-                    <button class="save-btn" @click="saveRecording()">Save</button>
-                    <button class="cancel-btn" @click="cancelRecording()">Cancel</button>
+                    <button class="save-btn" @click="saveRecording()">Save and Next</button>
+                    <button class="cancel-btn" @click="cancelRecording()">Record Again</button>
                 </div>
             </div>
         </div>

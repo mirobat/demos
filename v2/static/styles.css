@@ -133,3 +133,28 @@ html, body {
     text-align: center;
     width: 100%;
 }
+
+
+@keyframes blink {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0;
+    }
+}
+
+.recording-indicator {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #ff4444;
+    font-weight: bold;
+    font-size: large;
+    padding: 10px;
+}
+
+.recording-dots::after {
+    content: 'Recording';
+    animation: blink 1.5s steps(4, end) infinite;
+}
