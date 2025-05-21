@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["soundfile", "boto3", "loguru", "fastapi", "python-multipart", "uvicorn", "typer"]
+# dependencies = ["boto3", "loguru", "fastapi", "python-multipart", "uvicorn", "typer"]
 # ///
 # DO NOT MODIFY THE COMMENT ABOVE
 # Usage: install uv from https://docs.astral.sh/uv/, then simply
@@ -18,10 +18,9 @@ from pathlib import Path
 from time import sleep
 from typing import Optional
 
-import soundfile as sf
 import typer
 import uvicorn
-from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, Request, status
+from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, Request, status, Form
 from fastapi.responses import FileResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
@@ -166,7 +165,8 @@ def save_recording(audio, utterance_id, utterance_data, **extras):
 
     user = extras.get("user", "user")
     filename = os.path.join(RECORDINGS_DIR, f"{utterance_id}_{user}.wav")
-    sf.write(filename, audio[1], audio[0])
+    with open(filename, 'wb') as outfile:
+        outfile.write(audio[0])
 
     # Then update metadata with thread safety
     update_metadata(utterance_id, utterance_data, **extras)
@@ -327,11 +327,11 @@ async def get_sentence(request: Request):
 
 
 @app.post("/upload-audio")
-async def upload_audio(request: Request, audio: UploadFile = File(...)):
+async def upload_audio(request: Request, audio: UploadFile = File(...), sampleRate: Optional[str] = Form(None)):
     """Save the uploaded audio file."""
     try:
-
-        INTERFACE.save_and_next(audio, "Unknown", request)
+        content = await audio.read()
+        INTERFACE.save_and_next((content, int(sampleRate)), "Unknown", request)
         return {"message": "Audio uploaded successfully"}
     except Exception as e:
         import traceback

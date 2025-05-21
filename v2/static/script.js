@@ -65,8 +65,12 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
 
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const sampleRate = audioContext.sampleRate;
+
             const formData = new FormData();
             formData.append('audio', this.audioBlob, 'recording.wav');
+            formData.append('sampleRate', sampleRate);
 
             this.isLoading = true;
             try {
