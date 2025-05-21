@@ -9,6 +9,9 @@
 </head>
 <body>
     <div class="App" x-data="recordingApp">
+        <div class="loading-overlay" x-show="isLoading">
+            <div class="loading-spinner"></div>
+        </div>
         <h1>Speech Recording App</h1>
         <div class="sentence-container">
             <h2>Please read this sentence:</h2>

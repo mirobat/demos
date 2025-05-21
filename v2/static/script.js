@@ -5,12 +5,14 @@ document.addEventListener('alpine:init', () => {
         hasRecording: false,
         sentence: '',
         audioBlob: null,
+        isLoading: false,
 
         async init() {
             await this.fetchSentence();
         },
 
         async fetchSentence() {
+            this.isLoading = true;
             try {
                 const response = await fetch('/get-sentence');
                 const data = await response.json();
@@ -18,6 +20,8 @@ document.addEventListener('alpine:init', () => {
             } catch (error) {
                 console.error('Error fetching sentence:', error);
                 this.sentence = 'Error loading sentence';
+            } finally {
+                this.isLoading = false;
             }
         },
 
@@ -64,6 +68,7 @@ document.addEventListener('alpine:init', () => {
             const formData = new FormData();
             formData.append('audio', this.audioBlob, 'recording.wav');
 
+            this.isLoading = true;
             try {
                 const response = await fetch('/upload-audio', {
                     method: 'POST',
@@ -80,6 +85,8 @@ document.addEventListener('alpine:init', () => {
             } catch (error) {
                 console.error('Error uploading recording:', error);
                 alert('Error uploading recording');
+            } finally {
+                this.isLoading = false;
             }
         },
 
