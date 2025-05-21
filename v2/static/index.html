@@ -5,19 +5,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Speech Recording App</title>
     <link rel="stylesheet" href="/static/styles.css">
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
 <body>
-    <div class="App">
+    <div class="App" x-data="recordingApp">
         <h1>Speech Recording App</h1>
         <div class="sentence-container">
             <h2>Please read this sentence:</h2>
-            <p id="sentence"></p>
+            <p x-text="sentence"></p>
         </div>
         <div class="recording-controls">
-            <button id="recordButton">Start Recording</button>
+            <button 
+                x-text="isRecording ? 'Stop Recording' : 'Start Recording'"
+                @click="toggleRecording()"
+                :disabled="hasRecording && !isRecording">
+            </button>
         </div>
-        <div id="recordingIndicator" class="recording-indicator" style="display: none;">
+        <div class="recording-indicator" x-show="isRecording">
             Recording...
+        </div>
+        
+        <div class="audio-preview" x-show="hasRecording">
+            <h3>Recording Preview:</h3>
+            <audio x-ref="audioPlayer" controls></audio>
+            <div class="preview-controls">
+                <button class="save-btn" @click="saveRecording()">Save</button>
+                <button class="cancel-btn" @click="cancelRecording()">Cancel</button>
+            </div>
         </div>
     </div>
     <script src="https://cdn.rawgit.com/mattdiamond/Recorderjs/08e7abd9/dist/recorder.js"></script>

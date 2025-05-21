@@ -1,60 +1,68 @@
-let audioRecorder = null;
-let isRecording = false;
+document.addEventListener('alpine:init', () => {
+    Alpine.data('recordingApp', () => ({
+        audioRecorder: null,
+        isRecording: false,
+        hasRecording: false,
+        sentence: '',
+        audioBlob: null,
 
-// Get DOM elements
-const recordButton = document.getElementById('recordButton');
-const recordingIndicator = document.getElementById('recordingIndicator');
-const sentenceElement = document.getElementById('sentence');
+        async init() {
+            await this.fetchSentence();
+        },
 
-// Fetch sentence when page loads
-window.addEventListener('load', fetchSentence);
-
-async function fetchSentence() {
-    try {
-        const response = await fetch('/get-sentence');
-        const data = await response.json();
-        sentenceElement.textContent = data.sentence;
-    } catch (error) {
-        console.error('Error fetching sentence:', error);
-        sentenceElement.textContent = 'Error loading sentence';
-    }
-}
-
-// Initialize audio recorder
-function initializeRecorder(stream) {
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const input = audioContext.createMediaStreamSource(stream);
-    audioRecorder = new Recorder(input);
-}
-
-// Handle recording button click
-recordButton.addEventListener('click', async () => {
-    if (!isRecording) {
-        // Start recording
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            if (!audioRecorder) {
-                initializeRecorder(stream);
+        async fetchSentence() {
+            try {
+                const response = await fetch('/get-sentence');
+                const data = await response.json();
+                this.sentence = data.sentence;
+            } catch (error) {
+                console.error('Error fetching sentence:', error);
+                this.sentence = 'Error loading sentence';
             }
-            audioRecorder.record();
-            isRecording = true;
-            recordButton.textContent = 'Stop Recording';
-            recordingIndicator.style.display = 'block';
-        } catch (error) {
-            console.error('Error starting recording:', error);
-            alert('Error starting recording');
-        }
-    } else {
-        // Stop recording
-        audioRecorder.stop();
-        isRecording = false;
-        recordButton.textContent = 'Start Recording';
-        recordingIndicator.style.display = 'none';
+        },
 
-        // Export the audio
-        audioRecorder.exportWAV(async (blob) => {
+        initializeRecorder(stream) {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const input = audioContext.createMediaStreamSource(stream);
+            this.audioRecorder = new Recorder(input);
+        },
+
+        async toggleRecording() {
+            if (!this.isRecording) {
+                // Start recording
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({audio: true});
+                    if (!this.audioRecorder) {
+                        this.initializeRecorder(stream);
+                    }
+                    this.audioRecorder.record();
+                    this.isRecording = true;
+                } catch (error) {
+                    console.error('Error starting recording:', error);
+                    alert('Error starting recording');
+                }
+            } else {
+                // Stop recording
+                this.audioRecorder.stop();
+                this.isRecording = false;
+
+                // Create preview
+                this.audioRecorder.exportWAV((blob) => {
+                    this.audioBlob = blob;
+                    const audioUrl = URL.createObjectURL(blob);
+                    this.$refs.audioPlayer.src = audioUrl;
+                    this.hasRecording = true;
+                });
+            }
+        },
+
+        async saveRecording() {
+            if (!this.audioBlob) {
+                return;
+            }
+
             const formData = new FormData();
-            formData.append('audio', blob, 'recording.wav');
+            formData.append('audio', this.audioBlob, 'recording.wav');
 
             try {
                 const response = await fetch('/upload-audio', {
@@ -63,9 +71,9 @@ recordButton.addEventListener('click', async () => {
                 });
 
                 if (response.ok) {
-                    alert('Recording uploaded successfully!');
-                    // Clear recorder for next recording
-                    audioRecorder.clear();
+                    // alert('Recording uploaded successfully!');
+                    this.resetRecording();
+                    await this.fetchSentence();
                 } else {
                     alert('Error uploading recording');
                 }
@@ -73,6 +81,19 @@ recordButton.addEventListener('click', async () => {
                 console.error('Error uploading recording:', error);
                 alert('Error uploading recording');
             }
-        });
-    }
+        },
+
+        cancelRecording() {
+            this.resetRecording();
+        },
+
+        resetRecording() {
+            if (this.audioRecorder) {
+                this.audioRecorder.clear();
+            }
+            this.hasRecording = false;
+            this.audioBlob = null;
+            this.$refs.audioPlayer.src = '';
+        }
+    }));
 });
