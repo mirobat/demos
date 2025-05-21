@@ -42,7 +42,7 @@ app = FastAPI()
 
 # Initialize HTTP Basic Auth
 security = HTTPBasic()
-USERNAME = "demo"
+PASSWORD = "demo"
 INTERFACE = None
 
 
@@ -277,18 +277,16 @@ def update_metadata(utterance_id, utterance_data, **extras):
 
 def main(cutset_file: str, backup_bucket: str, password: Optional[str] = None):
     load_cutset(cutset_file)
-    global INTERFACE
+    global INTERFACE, PASSWORD, IS_LOCAL_DEV
     INTERFACE = RecordingInterface()
-    args = dict(host="0.0.0.0", port=7860)
-
-    global IS_LOCAL_DEV
+    PASSWORD = password
     IS_LOCAL_DEV = (password is None)
 
+    args = dict(host="0.0.0.0", port=7860)
     if not IS_LOCAL_DEV:
         # don't back up locally to avoid overwriting prod data
         BackupThread(backup_bucket).start()
         # use a password and an SSL cert
-        auth = ('demo', password)
         uvicorn.run(app, **args, ssl_keyfile='key.pem', ssl_certfile='cert.pem',  # ssl_verify=False
                     )
     else:
@@ -298,19 +296,19 @@ def main(cutset_file: str, backup_bucket: str, password: Optional[str] = None):
 
 def verify_credentials(credentials: HTTPBasicCredentials = Depends(security)):
     """Verify HTTP Basic Auth credentials."""
-    correct_username = secrets.compare_digest(credentials.username, USERNAME)
-    correct_password = secrets.compare_digest(credentials.password, USERNAME)
+    if not IS_LOCAL_DEV:
+        correct_username = secrets.compare_digest(credentials.username, PASSWORD)
+        correct_password = secrets.compare_digest(credentials.password, PASSWORD)
 
-    if not (correct_username and correct_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials",
-            headers={"WWW-Authenticate": "Basic"},
-        )
+        if not (correct_username and correct_password):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid credentials",
+                headers={"WWW-Authenticate": "Basic"},
+            )
     return credentials
 
 
-# Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
