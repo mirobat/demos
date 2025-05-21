@@ -4,6 +4,8 @@ document.addEventListener('alpine:init', () => {
         isRecording: false,
         hasRecording: false,
         sentence: '',
+        recordedCount: 0,
+        accent: '',
         audioBlob: null,
         isLoading: false,
 
@@ -11,12 +13,13 @@ document.addEventListener('alpine:init', () => {
             await this.fetchSentence();
         },
 
-        async fetchSentence() {
+        async fetchSentence(skip=false) {
             this.isLoading = true;
             try {
-                const response = await fetch('/get-sentence');
+                const response = await fetch('/get-sentence?' + new URLSearchParams({skip}).toString());
                 const data = await response.json();
                 this.sentence = data.sentence;
+                this.recordedCount = data.count;
             } catch (error) {
                 console.error('Error fetching sentence:', error);
                 this.sentence = 'Error loading sentence';
@@ -71,6 +74,7 @@ document.addEventListener('alpine:init', () => {
             const formData = new FormData();
             formData.append('audio', this.audioBlob, 'recording.wav');
             formData.append('sampleRate', sampleRate);
+            formData.append('accent', this.accent);
 
             this.isLoading = true;
             try {
@@ -105,6 +109,11 @@ document.addEventListener('alpine:init', () => {
             this.hasRecording = false;
             this.audioBlob = null;
             this.$refs.audioPlayer.src = '';
+        },
+
+        async skip(){
+            this.resetRecording();
+            await this.fetchSentence(true);
         }
     }));
 });

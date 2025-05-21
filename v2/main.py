@@ -43,7 +43,7 @@ app = FastAPI()
 # Initialize HTTP Basic Auth
 security = HTTPBasic()
 PASSWORD = "demo"
-INTERFACE = None
+INTERFACE: Optional['RecordingInterface'] = None
 
 
 def generate_fingerprint(request: Request) -> str:
@@ -210,6 +210,7 @@ class RecordingInterface:
 
     def skip(self, request: Request):
         user = generate_fingerprint(request)
+        logger.info(f'Skipping for user', user)
         if self.current_utterance[user]:
             remove_active_utterance(self.current_utterance[user]['id'])
         self.current_utterance[user] = get_next_utterance()
@@ -319,17 +320,21 @@ async def read_root(credentials: HTTPBasicCredentials = Depends(verify_credentia
 
 
 @app.get("/get-sentence")
-async def get_sentence(request: Request):
-    """Return a random sentence from the list."""
-    return {"sentence": INTERFACE.get_text(request)}
+async def get_sentence(request: Request, skip: bool = False):
+    if skip:
+        INTERFACE.skip(request)
+    return {"sentence": INTERFACE.get_text(request), "count": str(INTERFACE.get_recording_count(request))}
 
 
 @app.post("/upload-audio")
-async def upload_audio(request: Request, audio: UploadFile = File(...), sampleRate: Optional[str] = Form(None)):
+async def upload_audio(request: Request, audio: UploadFile = File(...),
+                       sampleRate: Optional[str] = Form(None),
+                       accent: Optional[str] = Form(None)
+                       ):
     """Save the uploaded audio file."""
     try:
         content = await audio.read()
-        INTERFACE.save_and_next((content, int(sampleRate)), "Unknown", request)
+        INTERFACE.save_and_next((content, int(sampleRate)), accent, request)
         return {"message": "Audio uploaded successfully"}
     except Exception as e:
         import traceback

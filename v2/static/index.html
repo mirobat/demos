@@ -9,49 +9,61 @@
 </head>
 <body>
     <div class="App" x-data="recordingApp">
-        <div class="loading-overlay" x-show="isLoading">
-            <div class="loading-spinner"></div>
-        </div>
-        <h1>Speech Recording App</h1>
-        <div class="instructions sentence-container">
-            Welcome to the audio recording interface!
+        <div class="content">
+            <div class="loading-overlay" x-show="isLoading">
+                <div class="loading-spinner"></div>
+            </div>
+            <h1>Speech Recording App</h1>
+            <div class="instructions sentence-container">
+                Welcome to the audio recording interface!
 
-            Instructions:
-            <ol>
-                <li>Enter your native language or accent type in the box below (only used to study whether models underperform for specific accents)</li>
-                <li>Read the sentence displayed below. If unsure how to pronounce any word, skip the sentence.</li>
-                <li>Click the record button and speak clearly. It's best to pronounce the sentence in your mind once so you don't pause to think while recording.</li>
-                <li>Click stop when you're done speaking. A 'Save and Next' button will appear shortly. After the button appears, you may need to wait for a few seconds until the audio widget is reloaded. <strong>Do not</strong> click Save until the audio widget has reloaded.</li>
-                <li>You can listen to your recording.</li>
-                <li>If you're satisfied, click 'Save and Next', otherwise 'Record Again'.</li>
-                <li>If you want to skip the current sentence, click 'Skip'.</li>
-                <li>If you run into any issues, <strong>reload the page first</strong>. Reach out to mirobat@ or alexnls@ for support.</li>
-            </ol>
-        </div>
+                Instructions:
+                <ol>
+                    <li>Enter your native language or accent type in the box below (only used to study whether models underperform for specific accents)</li>
+                    <li>Read the sentence displayed below. If unsure how to pronounce any word, skip the sentence.</li>
+                    <li>Click the record button and speak clearly. It's best to pronounce the sentence in your mind once so you don't pause to think while recording.</li>
+                    <li>Click stop when you're done speaking. A 'Save and Next' button will appear shortly. After the button appears, you may need to wait for a few seconds until the audio widget is reloaded. <strong>Do not</strong> click Save until the audio widget has reloaded.</li>
+                    <li>You can listen to your recording.</li>
+                    <li>If you're satisfied, click 'Save and Next', otherwise 'Record Again'.</li>
+                    <li>If you want to skip the current sentence, click 'Skip'.</li>
+                    <li>If you run into any issues, <strong>reload the page first</strong>. Reach out to mirobat@ or alexnls@ for support.</li>
+                </ol>
+            </div>
+            <div class="sentence-container">
+                <p>Your native language or accent type (optional)</p>
+                <input x-model="accent">
+            </div>
 
-        <div class="sentence-container">
-            <h2>Please read this sentence:</h2>
-            <p x-text="sentence"></p>
-        </div>
-        <div class="recording-controls">
-            <button
-                x-text="isRecording ? 'Stop Recording' : 'Start Recording'"
-                @click="toggleRecording()"
-                :disabled="hasRecording && !isRecording">
-            </button>
-        </div>
-        <div class="recording-indicator" x-show="isRecording">
-            Recording...
-        </div>
+            <div class="sentence-container">
+                <h2>Please read this sentence:</h2>
+                <h3 x-text="sentence"></h3>
+            </div>
+            <div class="recording-controls">
+                <button
+                    x-text="isRecording ? 'Stop Recording' : 'Start Recording'"
+                    @click="toggleRecording()"
+                    :disabled="hasRecording && !isRecording">
+                </button>
+                <button
+                    x-text="isRecording ? 'Skip' : 'Skip'"
+                    @click="skip()"
+                    :disabled="hasRecording && !isRecording">
+                </button>
+            </div>
+            <div class="recording-indicator" x-show="isRecording">
+                Recording...
+            </div>
 
-        <div class="audio-preview" x-show="hasRecording">
-            <h3>Recording Preview:</h3>
-            <audio x-ref="audioPlayer" controls></audio>
-            <div class="preview-controls">
-                <button class="save-btn" @click="saveRecording()">Save</button>
-                <button class="cancel-btn" @click="cancelRecording()">Cancel</button>
+            <div class="audio-preview" x-show="hasRecording">
+                <h3>Recording Preview:</h3>
+                <audio x-ref="audioPlayer" controls></audio>
+                <div class="preview-controls">
+                    <button class="save-btn" @click="saveRecording()">Save</button>
+                    <button class="cancel-btn" @click="cancelRecording()">Cancel</button>
+                </div>
             </div>
         </div>
+        <div class="footer">You have recorded <span x-text="recordedCount"></span> sentences so far</div>
     </div>
     <script src="https://cdn.rawgit.com/mattdiamond/Recorderjs/08e7abd9/dist/recorder.js"></script>
     <script src="/static/script.js"></script>

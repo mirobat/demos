@@ -3,6 +3,10 @@
     margin: 0 auto;
     padding: 20px;
     text-align: center;
+
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
 }
 
 .instructions {
@@ -110,4 +114,22 @@
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+
+html, body {
+    height: 100%;
+    margin: 0;
+}
+
+
+.content {
+    flex: 1;
+}
+
+.footer {
+    background-color: #202020;
+    color: white;
+    padding: 20px;
+    text-align: center;
+    width: 100%;
 }
