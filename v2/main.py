@@ -282,7 +282,7 @@ def main(cutset_file: str, backup_bucket: str, password: Optional[str] = None):
     PASSWORD = password
     IS_LOCAL_DEV = (password is None)
 
-    args = dict(host="0.0.0.0", port=7860)
+    args = dict(host="0.0.0.0", port=7861)
     if not IS_LOCAL_DEV:
         # don't back up locally to avoid overwriting prod data
         BackupThread(backup_bucket).start()
