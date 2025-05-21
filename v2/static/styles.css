@@ -5,6 +5,9 @@
     text-align: center;
 }
 
+.instructions {
+    text-align: left;
+}
 .sentence-container {
     margin: 20px 0;
     padding: 20px;
