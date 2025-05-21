@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speech Recording App</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="App">
+        <h1>Speech Recording App</h1>
+        <div class="sentence-container">
+            <h2>Please read this sentence:</h2>
+            <p id="sentence"></p>
+        </div>
+        <div class="recording-controls">
+            <button id="recordButton">Start Recording</button>
+        </div>
+        <div id="recordingIndicator" class="recording-indicator" style="display: none;">
+            Recording...
+        </div>
+    </div>
+    <script src="https://cdn.rawgit.com/mattdiamond/Recorderjs/08e7abd9/dist/recorder.js"></script>
+    <script src="/static/script.js"></script>
+</body>
+</html>

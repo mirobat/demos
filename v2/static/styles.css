@@ -1,0 +1,33 @@
+.App {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    text-align: center;
+}
+
+.sentence-container {
+    margin: 20px 0;
+    padding: 20px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+.recording-controls button {
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+}
+
+.recording-controls button:hover {
+    background-color: #0056b3;
+}
+
+.recording-indicator {
+    margin-top: 20px;
+    color: red;
+    font-weight: bold;
+}
