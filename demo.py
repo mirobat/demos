@@ -17,6 +17,7 @@
 # sudo systemctl status gradio
 # or get logs
 # sudo journalctl -u gradio -f
+# to deploy: ssh into machine, `git pull && sudo systemctl start gradio`
 from datetime import datetime, timezone
 import gzip
 import os
