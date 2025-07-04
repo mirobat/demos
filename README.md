@@ -54,6 +54,12 @@ The app has a thin backend with 2 HTTP endpoint:
 
 There are no user accounts. The identity of each user is determined by fingerprinting their browser, using request headers such as IP, user agent and browser language.
 
+The frontend is using Alpine.js to drive a simple state machine, either
+- load page, get utterance, record audio, send to backend
+- load page, get utterance, skip N times, record audio, send to backend
+The actual audio recording is handled by Recorder.js 
+
+
 ## EC2 deployment
 Launch an EC2 instance. The app is pretty light so a `t3.small` (2 vCPUs/2 GB RAM) instance is just fine. If you expect more than 10 concurrent users get a `t3.large` just to be safe. Follow [this doc] to allocate a public static IP to your instance. Make sure the instance role has permission to write into the S3 bucket you provide below.
 
