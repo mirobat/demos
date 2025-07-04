@@ -5,6 +5,19 @@
 # DO NOT MODIFY THE COMMENT ABOVE
 # Usage: install uv from https://docs.astral.sh/uv/, then simply
 # `uv run demo.py <cutset> <backup_bucket_name> <UI_password>`.
+# No need to set up a virtual env etc
+# For EC2 deployment, generate a self-signed key
+# openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -sha256 -days 3650 -nodes -subj "/C=XX/ST=StateName/L=CityName/O=CompanyName/OU=CompanySectionName/CN=CommonNameOrHostname"
+# edit service2.txt to set a password
+# sudo cp service2.txt /etc/systemd/system/alpine.service
+# sudo systemctl daemon-reload
+# sudo systemctl enable alpine
+# sudo systemctl start alpine
+# Then monitor the app:
+# sudo systemctl status alpine
+# or get logs
+# sudo journalctl -u alpine -f
+# to deploy: ssh into machine, `git pull && sudo systemctl start alpine`
 import gzip
 import hashlib
 import json
@@ -63,8 +76,6 @@ def generate_fingerprint(request: Request) -> str:
             browser = 'Safari'
     fingerprint_str = json.dumps(fingerprint_data, sort_keys=True)
 
-    cookie_ = request.headers.get('cookie', '')
-    print(hashlib.sha256(cookie_.encode()).hexdigest()[:16])
     return hashlib.sha256(fingerprint_str.encode()).hexdigest()[:16] + browser
 
 
@@ -74,6 +85,7 @@ class BackupThread(threading.Thread):
         self.bucket = bucket
         self.files = [ACTIVE_UTTERANCES_FILE, METADATA_FILE]
         self.directories = [RECORDINGS_DIR]
+        logger.info('Will back data up to %s', bucket)
 
     def _backup(self):
         import boto3
@@ -276,22 +288,22 @@ def update_metadata(utterance_id, utterance_data, **extras):
     save_metadata(metadata)
 
 
-def main(cutset_file: str, backup_bucket: str, password: Optional[str] = None):
+def main(cutset_file: str, backup_bucket: Optional[str] = None, password: Optional[str] = None):
+    logger.info(f"Arguments are: {cutset_file=}, {backup_bucket=}, {password=}")
     load_cutset(cutset_file)
     global INTERFACE, PASSWORD, IS_LOCAL_DEV
     INTERFACE = RecordingInterface()
     PASSWORD = password
-    IS_LOCAL_DEV = (password is None)
+    IS_LOCAL_DEV = (password is None) or (backup_bucket is None)
 
     args = dict(host="0.0.0.0", port=7861)
     if not IS_LOCAL_DEV:
         # don't back up locally to avoid overwriting prod data
         BackupThread(backup_bucket).start()
         # use a password and an SSL cert
-        uvicorn.run(app, **args, ssl_keyfile='key.pem', ssl_certfile='cert.pem',  # ssl_verify=False
-                    )
+        uvicorn.run(app, **args, ssl_keyfile='key.pem', ssl_certfile='cert.pem')
     else:
-        logger.info('Starting in local mode')
+        logger.info('Starting in local mode. Data will NOT be backed up to S3')
         uvicorn.run(app, **args)
 
 
