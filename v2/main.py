@@ -19,7 +19,6 @@
 # sudo journalctl -u alpine -f
 # to deploy: ssh into machine, `git pull && sudo systemctl start alpine`
 import gzip
-import hashlib
 import json
 import os
 import random
@@ -59,24 +58,15 @@ PASSWORD = "demo"
 INTERFACE: Optional['RecordingInterface'] = None
 
 
-def generate_fingerprint(request: Request) -> str:
-    """Generate a consistent fingerprint for a user based on request data."""
-    # Collect identifying information
-    fingerprint_data = {
-        "ip": request.client.host,
-        "user_agent": request.headers.get("User-Agent", ""),
-        "language": request.headers.get("Accept-Language", "")
-    }
-
-    browser = ''
-    if IS_LOCAL_DEV:
-        if 'Firefox/' in fingerprint_data['user_agent']:
-            browser = 'Firefox'
-        elif 'Safari/' in fingerprint_data['user_agent']:
-            browser = 'Safari'
-    fingerprint_str = json.dumps(fingerprint_data, sort_keys=True)
-
-    return hashlib.sha256(fingerprint_str.encode()).hexdigest()[:16] + browser
+def get_username_from_request(request: Request) -> str:
+    """Get username from X-Username header."""
+    username = request.headers.get('X-Username')
+    if not username:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Username required in X-Username header"
+        )
+    return username.strip()
 
 
 class BackupThread(threading.Thread):
@@ -203,7 +193,7 @@ class RecordingInterface:
                 f.write('')
 
     def get_text(self, request: Request):
-        user = generate_fingerprint(request)
+        user = get_username_from_request(request)
         if not self.current_utterance[user]:
             self.current_utterance[user] = get_next_utterance()
             if not self.current_utterance[user]:
@@ -214,15 +204,15 @@ class RecordingInterface:
         return txt
 
     def get_recording_count(self, request: Request):
-        user = generate_fingerprint(request)
+        user = get_username_from_request(request)
         return self.utterance_count[user]
 
     def _init(self, request: Request):
         return self.get_recording_count(request), self.get_text(request)
 
     def skip(self, request: Request):
-        user = generate_fingerprint(request)
-        logger.info(f'Skipping for user', user)
+        user = get_username_from_request(request)
+        logger.info(f'Skipping for user {user}')
         if self.current_utterance[user]:
             remove_active_utterance(self.current_utterance[user]['id'])
         self.current_utterance[user] = get_next_utterance()
@@ -231,7 +221,7 @@ class RecordingInterface:
         return self.current_utterance[user]['supervisions'][0]['text'], None, self.utterance_count[user]
 
     def save_and_next(self, audio, accent, request: Request):
-        user = generate_fingerprint(request)
+        user = get_username_from_request(request)
         if audio is None:
             logger.info('skipping loop')
             return self.current_utterance[user]['supervisions'][0]['text'], None, self.utterance_count[user]
@@ -251,7 +241,7 @@ class RecordingInterface:
         return "Please record audio before saving.", None, self.utterance_count[user]  # TODO should never hit here
 
     def record_again(self, request: Request):
-        user = generate_fingerprint(request)
+        user = get_username_from_request(request)
         if not self.current_utterance[user]:
             return "No current utterance.", None, self.utterance_count[user]
         return self.current_utterance[user]['supervisions'][0]['text'], None, self.utterance_count[user]
@@ -333,6 +323,7 @@ async def read_root(credentials: HTTPBasicCredentials = Depends(verify_credentia
 
 @app.get("/get-sentence")
 async def get_sentence(request: Request, skip: bool = False):
+    get_username_from_request(request) # fail fast if not authenticated
     if skip:
         INTERFACE.skip(request)
     return {"sentence": INTERFACE.get_text(request), "count": str(INTERFACE.get_recording_count(request))}
@@ -345,6 +336,7 @@ async def upload_audio(request: Request, audio: UploadFile = File(...),
                        ):
     """Save the uploaded audio file."""
     try:
+        get_username_from_request(request) # fail fast if not authenticated
         content = await audio.read()
         INTERFACE.save_and_next((content, int(sampleRate)), accent, request)
         return {"message": "Audio uploaded successfully"}

@@ -8,15 +8,41 @@ document.addEventListener('alpine:init', () => {
         accent: '',
         audioBlob: null,
         isLoading: false,
-
+        isLoggedIn: false,
+        username: '',
         async init() {
-            await this.fetchSentence();
+            const storedUsername = localStorage.getItem('username');
+            if (storedUsername && storedUsername.trim()) {
+                this.username = storedUsername.trim();
+                this.isLoggedIn = true;
+                await this.fetchSentence();
+            }
+        },
+        async login() {
+            if (this.username && this.username.trim()) {
+                const trimmedUsername = this.username.trim();
+                localStorage.setItem('username', trimmedUsername);
+                this.username = trimmedUsername;
+                this.isLoggedIn = true;
+                await this.fetchSentence();
+            }
+        },
+        logout() {
+            localStorage.removeItem('username');
+            this.username = '';
+            this.isLoggedIn = false;
+            this.resetRecording();
         },
 
         async fetchSentence(skip=false) {
             this.isLoading = true;
             try {
-                const response = await fetch('/get-sentence?' + new URLSearchParams({skip}).toString());
+                if(!this.isLoggedIn) return;
+                const headers = {'X-Username': this.username};
+                
+                const response = await fetch('/get-sentence?' + new URLSearchParams({skip}).toString(), {
+                    headers: headers
+                });
                 const data = await response.json();
                 this.sentence = data.sentence;
                 this.recordedCount = data.count;
@@ -78,8 +104,13 @@ document.addEventListener('alpine:init', () => {
 
             this.isLoading = true;
             try {
+                if(!this.isLoggedIn) return;
+
+                const headers = {'X-Username': this.username};
+
                 const response = await fetch('/upload-audio', {
                     method: 'POST',
+                    headers: headers,
                     body: formData,
                 });
 

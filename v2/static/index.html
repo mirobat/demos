@@ -13,7 +13,35 @@
             <div class="loading-overlay" x-show="isLoading">
                 <div class="loading-spinner"></div>
             </div>
-            <h1>Speech Recording App</h1>
+            
+            <!-- Login Screen -->
+            <div class="login-screen" x-show="!isLoggedIn">
+                <h1>Welcome to Speech Recording App</h1>
+                <div class="login-container">
+                    <h2>Please enter your username</h2>
+                    <div class="login-form">
+                        <input 
+                            type="text" 
+                            x-model="username" 
+                            placeholder="Enter your username"
+                            @keyup.enter="login()"
+                            class="username-input">
+                        <button @click="login()" :disabled="!username.trim()" class="login-btn">
+                            Continue
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main App Content -->
+            <div x-show="isLoggedIn">
+                <div class="user-header">
+                    <h1>Speech Recording App</h1>
+                    <div class="user-info">
+                        Welcome, <span x-text="username"></span>
+                        <button @click="logout()" class="logout-btn">Logout</button>
+                    </div>
+                </div>
             <div class="instructions sentence-container">
                 Welcome to the audio recording interface!
 
@@ -62,8 +90,9 @@
                     <button class="cancel-btn" @click="cancelRecording()">Record Again</button>
                 </div>
             </div>
+            </div>
         </div>
-        <div class="footer">You have recorded <span x-text="recordedCount"></span> sentences so far</div>
+        <div class="footer" x-show="isLoggedIn">You have recorded <span x-text="recordedCount"></span> <span x-text="recordedCount == 1 ? 'sentence' : 'sentences'"></span> so far</div>
     </div>
     <script src="https://cdn.rawgit.com/mattdiamond/Recorderjs/08e7abd9/dist/recorder.js"></script>
     <script src="/static/script.js"></script>
