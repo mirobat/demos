@@ -322,7 +322,7 @@ async def read_root(credentials: HTTPBasicCredentials = Depends(verify_credentia
 
 
 @app.get("/get-sentence")
-async def get_sentence(request: Request, skip: bool = False):
+async def get_sentence(request: Request, skip: bool = False, credentials: HTTPBasicCredentials = Depends(verify_credentials)):
     get_username_from_request(request) # fail fast if not authenticated
     if skip:
         INTERFACE.skip(request)
@@ -332,7 +332,8 @@ async def get_sentence(request: Request, skip: bool = False):
 @app.post("/upload-audio")
 async def upload_audio(request: Request, audio: UploadFile = File(...),
                        sampleRate: Optional[str] = Form(None),
-                       accent: Optional[str] = Form(None)
+                       accent: Optional[str] = Form(None),
+                       credentials: HTTPBasicCredentials = Depends(verify_credentials)
                        ):
     """Save the uploaded audio file."""
     try:
