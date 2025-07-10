@@ -46,8 +46,6 @@ PASSWORD = "demo"
 INTERFACE: Optional['RecordingInterface'] = None
 
 
-# TODO adjust assignment logic- we want each utterance to be read at least 3 times
-# TODO do not show the same utt to the same user
 def get_username_from_request(request: Request) -> str:
     """Get username from X-Username header."""
     username = request.headers.get('X-Username')
@@ -138,7 +136,7 @@ def remove_active_utterance(utterance_id):
                 f.write(f"{uid}\n")
 
 
-def get_next_utterance():
+def get_next_utterance(user):
     recorded = get_recorded_utterances()
     active = get_active_utterances()
 
@@ -148,8 +146,13 @@ def get_next_utterance():
 
     if not available:
         return None
-
+    metadata = load_metadata()
+    # there will be many utterances for the same entity- make sure this user sees this entity once
+    entities_for_this_user = {m['entity_id'] for m in metadata.values() if m.get('user') == user}
     utterance = random.choice(available)
+    entity_id = utterance['supervisions'][0]['custom']['NE_id']
+    while entity_id in entities_for_this_user:
+        utterance = random.choice(available)
     add_active_utterance(utterance['id'])
     return utterance
 
@@ -188,7 +191,7 @@ class RecordingInterface:
     def get_text(self, request: Request):
         user = get_username_from_request(request)
         if not self.current_utterance[user]:
-            self.current_utterance[user] = get_next_utterance()
+            self.current_utterance[user] = get_next_utterance(user)
             if not self.current_utterance[user]:
                 return "No more utterances available."
 
@@ -208,7 +211,7 @@ class RecordingInterface:
         logger.info(f'Skipping for user {user}')
         if self.current_utterance[user]:
             remove_active_utterance(self.current_utterance[user]['id'])
-        self.current_utterance[user] = get_next_utterance()
+        self.current_utterance[user] = get_next_utterance(user)
         if not self.current_utterance[user]:
             return "No more utterances available.", None, self.utterance_count[user]
         return self.current_utterance[user]['supervisions'][0]['text'], None, self.utterance_count[user]
@@ -226,7 +229,7 @@ class RecordingInterface:
             save_recording(audio, self.current_utterance[user]['id'], self.current_utterance[user], accent=accent,
                            user=user, recorded_at=now)
             self.utterance_count[user] += 1
-            self.current_utterance[user] = get_next_utterance()
+            self.current_utterance[user] = get_next_utterance(user)
             if not self.current_utterance[user]:
                 return "No more utterances available.", None, self.utterance_count[user]
             return self.current_utterance[user]['supervisions'][0]['text'], None, self.utterance_count[user]
