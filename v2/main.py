@@ -6,18 +6,7 @@
 # Usage: install uv from https://docs.astral.sh/uv/, then simply
 # `uv run demo.py <cutset> <backup_bucket_name> <UI_password>`.
 # No need to set up a virtual env etc
-# For EC2 deployment, generate a self-signed key
-# openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -sha256 -days 3650 -nodes -subj "/C=XX/ST=StateName/L=CityName/O=CompanyName/OU=CompanySectionName/CN=CommonNameOrHostname"
-# edit service2.txt to set a password
-# sudo cp service2.txt /etc/systemd/system/alpine.service
-# sudo systemctl daemon-reload
-# sudo systemctl enable alpine
-# sudo systemctl start alpine
-# Then monitor the app:
-# sudo systemctl status alpine
-# or get logs
-# sudo journalctl -u alpine -f
-# to deploy: ssh into machine, `git pull && sudo systemctl start alpine`
+# For EC2 deployment, see a readme
 import gzip
 import json
 import os
@@ -55,6 +44,7 @@ app = FastAPI()
 security = HTTPBasic()
 PASSWORD = "demo"
 INTERFACE: Optional['RecordingInterface'] = None
+
 
 # TODO adjust assignment logic- we want each utterance to be read at least 3 times
 # TODO do not show the same utt to the same user
@@ -281,7 +271,9 @@ def update_metadata(utterance_id, utterance_data, **extras):
     save_metadata(metadata)
 
 
-def main(cutset_file: str, backup_bucket: Optional[str] = None, password: Optional[str] = None, port=7861):
+def main(cutset_file: str, backup_bucket: Optional[str] = None,
+         password: Optional[str] = None,
+         port: Optional[int] = 7861):
     logger.info(f"Arguments are: {cutset_file=}, {backup_bucket=}, {password=}")
     load_cutset(cutset_file)
     global INTERFACE, PASSWORD, IS_LOCAL_DEV, METADATA_FILE, RECORDINGS_DIR, ACTIVE_UTTERANCES_FILE, BACKUP_DIR
@@ -331,8 +323,9 @@ async def read_root(credentials: HTTPBasicCredentials = Depends(verify_credentia
 
 
 @app.get("/get-sentence")
-async def get_sentence(request: Request, skip: bool = False, credentials: HTTPBasicCredentials = Depends(verify_credentials)):
-    get_username_from_request(request) # fail fast if not authenticated
+async def get_sentence(request: Request, skip: bool = False,
+                       credentials: HTTPBasicCredentials = Depends(verify_credentials)):
+    get_username_from_request(request)  # fail fast if not authenticated
     if skip:
         INTERFACE.skip(request)
     return {"sentence": INTERFACE.get_text(request), "count": str(INTERFACE.get_recording_count(request))}
@@ -346,7 +339,7 @@ async def upload_audio(request: Request, audio: UploadFile = File(...),
                        ):
     """Save the uploaded audio file."""
     try:
-        get_username_from_request(request) # fail fast if not authenticated
+        get_username_from_request(request)  # fail fast if not authenticated
         content = await audio.read()
         INTERFACE.save_and_next((content, int(sampleRate)), accent, request)
         return {"message": "Audio uploaded successfully"}

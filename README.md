@@ -98,6 +98,9 @@ sudo systemctl status alpine # get status
 sudo journalctl -u alpine -f # get logs
 ```
 
+4. Deploy a new version
+ssh into machine, `git pull && sudo systemctl restart alpineen`
+
 
 ## Legal approval
 
