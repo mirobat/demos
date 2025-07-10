@@ -48,7 +48,7 @@ document.addEventListener('alpine:init', () => {
                 this.recordedCount = data.count;
             } catch (error) {
                 console.error('Error fetching sentence:', error);
-                this.sentence = 'Error loading sentence';
+                this.sentence = null;
             } finally {
                 this.isLoading = false;
             }

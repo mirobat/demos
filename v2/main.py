@@ -97,10 +97,27 @@ class BackupThread(threading.Thread):
             sleep(180)
 
 
+def open_file(filename):
+    """
+    Opens a file that could be either plain text or gzipped.
+    Returns a file object that can be read.
+    """
+    try:
+        f = gzip.open(filename, 'rt')  # 'rt' for text mode
+        # Try reading a small bit to verify it's actually gzipped
+        f.read(1)
+        f.seek(0)  # Reset to beginning of file
+        return f
+    except gzip.BadGzipFile:  # Not a gzip file
+        # Close the failed gzip attempt and open as regular file
+        f.close()
+        return open(filename, 'r')
+
+
 def load_cutset(cutset_path):
     logger.info(f'Cutset path is {cutset_path}')
     utterances = []
-    with gzip.open(cutset_path, 'rt') as f:
+    with open_file(cutset_path) as f:
         for line in f:
             utterance = json.loads(line)
             utterances.append(utterance)
@@ -149,6 +166,9 @@ def get_next_utterance(user):
     metadata = load_metadata()
     # there will be many utterances for the same entity- make sure this user sees this entity once
     entities_for_this_user = {m['entity_id'] for m in metadata.values() if m.get('user') == user}
+    if len(entities_for_this_user) == len(available):
+        # no more work left to do for this user
+        return None
     utterance = random.choice(available)
     entity_id = utterance['supervisions'][0]['custom']['NE_id']
     while entity_id in entities_for_this_user:
@@ -193,7 +213,7 @@ class RecordingInterface:
         if not self.current_utterance[user]:
             self.current_utterance[user] = get_next_utterance(user)
             if not self.current_utterance[user]:
-                return "No more utterances available."
+                return None
 
         txt = self.current_utterance[user]['supervisions'][0]['text']
         logger.info(f'Getting text {txt} for user {user}')
@@ -213,7 +233,7 @@ class RecordingInterface:
             remove_active_utterance(self.current_utterance[user]['id'])
         self.current_utterance[user] = get_next_utterance(user)
         if not self.current_utterance[user]:
-            return "No more utterances available.", None, self.utterance_count[user]
+            return None
         return self.current_utterance[user]['supervisions'][0]['text'], None, self.utterance_count[user]
 
     def save_and_next(self, audio, accent, request: Request):
@@ -280,7 +300,6 @@ def main(cutset_file: str, backup_bucket: Optional[str] = None,
     logger.info(f"Arguments are: {cutset_file=}, {backup_bucket=}, {password=}")
     load_cutset(cutset_file)
     global INTERFACE, PASSWORD, IS_LOCAL_DEV, METADATA_FILE, RECORDINGS_DIR, ACTIVE_UTTERANCES_FILE, BACKUP_DIR
-    INTERFACE = RecordingInterface()
     PASSWORD = password
     IS_LOCAL_DEV = (password is None) or (backup_bucket is None)
     data_root_dir = os.path.basename(cutset_file).split(".")[0]
@@ -289,6 +308,7 @@ def main(cutset_file: str, backup_bucket: Optional[str] = None,
     BACKUP_DIR = Path(BACKUP_DIR % data_root_dir)
     METADATA_FILE = METADATA_FILE % data_root_dir
     os.makedirs(RECORDINGS_DIR, exist_ok=True)
+    INTERFACE = RecordingInterface()
 
     args = dict(host="0.0.0.0", port=port)
     if not IS_LOCAL_DEV:

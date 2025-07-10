@@ -57,16 +57,16 @@
                     <li>If you run into any issues, <strong>reload the page first</strong>. Reach out to mirobat@ or alexnls@ for support.</li>
                 </ol>
             </div>
-            <div class="sentence-container">
+            <div class="sentence-container" x-show="sentence">
                 <p>Your native language or accent type (optional)</p>
                 <input x-model="accent">
             </div>
 
-            <div class="sentence-container">
+            <div class="sentence-container" x-show="sentence">
                 <h2>Please read this sentence:</h2>
                 <h3 x-text="sentence"></h3>
             </div>
-            <div class="recording-controls">
+            <div class="recording-controls" x-show="sentence">
                 <button
                     x-text="isRecording ? 'Stop Recording' : 'Start Recording'"
                     @click="toggleRecording()"
@@ -77,6 +77,9 @@
                     @click="skip()"
                     :disabled="isRecording">
                 </button>
+            </div>
+            <div class="thank-you-message" x-show="!sentence">
+                Thank you, you've completed all tasks assigned to you.
             </div>
             <div class="recording-indicator" x-show="isRecording">
                 <span class="recording-dots"> </span>
