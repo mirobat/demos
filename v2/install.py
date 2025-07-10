@@ -1,6 +1,6 @@
 import os
 
-TEMPLATE = f"""
+TEMPLATE = """
 [Unit]
 Description=AlpineInterface
 After=network.target
@@ -22,7 +22,7 @@ WantedBy=multi-user.target
 """
 
 PASS="demo"
-for i, (lang, cutset) in enumerate(("en", "../cutset_eval_34080utt_10129NEs_31.3h_05_08_2025.jsonl.gz")):
+for i, (lang, cutset) in enumerate(["en", "../cutset_eval_34080utt_10129NEs_31.3h_05_08_2025.jsonl.gz"]):
     """
     sudo cp service2.txt /etc/systemd/system/alpine.service
     sudo systemctl daemon-reload

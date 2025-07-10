@@ -86,7 +86,7 @@ openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -sha256 -days 3
 1. Configure systemd service that restarts the app in case it crashes:
 ```bash
 # edit install.py and set a password and add datasets. Change the paths to uv and main.py if necessary
-sudo uv run install.py
+sudo /home/ec2-user/.local/bin/uv run v2/install.py
 ```
 
 1. The app should be running on port 7861. Navigate to `<YOUR INSTANCE IP>:7861` to check.
