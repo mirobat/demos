@@ -40,14 +40,13 @@ from loguru import logger
 
 # Constants
 UTTERANCES = []
-RECORDINGS_DIR = 'recordings'
-ACTIVE_UTTERANCES_FILE = 'active_utterances.txt'
 IS_LOCAL_DEV = False
-BACKUP_DIR = Path('labelled_audio_v2')
-METADATA_FILE = 'metadata.json'
+# All file paths are deliberately pattern string and not valid paths to force the user to provide a %sroot dir
+RECORDINGS_DIR = '%s/recordings'
+ACTIVE_UTTERANCES_FILE = '%s/active_utterances.txt'
+BACKUP_DIR = 'labelled_audio_v2/%s'
+METADATA_FILE = '%s/metadata.json'
 metadata_lock = threading.Lock()
-
-os.makedirs(RECORDINGS_DIR, exist_ok=True)
 
 active_lock = threading.Lock()
 app = FastAPI()
@@ -57,7 +56,8 @@ security = HTTPBasic()
 PASSWORD = "demo"
 INTERFACE: Optional['RecordingInterface'] = None
 
-
+# TODO adjust assignment logic- we want each utterance to be read at least 3 times
+# TODO do not show the same utt to the same user
 def get_username_from_request(request: Request) -> str:
     """Get username from X-Username header."""
     username = request.headers.get('X-Username')
@@ -72,6 +72,7 @@ def get_username_from_request(request: Request) -> str:
 class BackupThread(threading.Thread):
     def __init__(self, bucket):
         super().__init__()
+        assert bucket
         self.bucket = bucket
         self.files = [ACTIVE_UTTERANCES_FILE, METADATA_FILE]
         self.directories = [RECORDINGS_DIR]
@@ -84,9 +85,10 @@ class BackupThread(threading.Thread):
         # Upload individual files
         for file in self.files:
             if file and os.path.exists(file):
-                logger.info(f'\tcopy {file} to {str(BACKUP_DIR / os.path.basename(file))} ')
+                target = str(BACKUP_DIR / os.path.basename(file))
+                logger.info(f'\tcopy {file} to {target} ')
                 s3.upload_file(file, self.bucket,
-                               str(BACKUP_DIR / os.path.basename(file)))
+                               target)
 
         # Upload directories recursively
         for directory in self.directories:
@@ -96,8 +98,9 @@ class BackupThread(threading.Thread):
                         local_path = os.path.join(root, file)
                         # Preserve directory structure in S3 key
                         s3_path = os.path.join(os.path.relpath(root), file)
-                        logger.info(f'\tcopy {file} to {str(BACKUP_DIR / s3_path)} ')
-                        s3.upload_file(local_path, self.bucket, str(BACKUP_DIR / s3_path))
+                        target = str(BACKUP_DIR / Path(*Path(s3_path).parts[1:]))
+                        logger.info(f'\tcopy {file} to {target} ')
+                        s3.upload_file(local_path, self.bucket, target)
 
     def run(self):
         while True:
@@ -278,15 +281,21 @@ def update_metadata(utterance_id, utterance_data, **extras):
     save_metadata(metadata)
 
 
-def main(cutset_file: str, backup_bucket: Optional[str] = None, password: Optional[str] = None):
+def main(cutset_file: str, backup_bucket: Optional[str] = None, password: Optional[str] = None, port=7861):
     logger.info(f"Arguments are: {cutset_file=}, {backup_bucket=}, {password=}")
     load_cutset(cutset_file)
-    global INTERFACE, PASSWORD, IS_LOCAL_DEV
+    global INTERFACE, PASSWORD, IS_LOCAL_DEV, METADATA_FILE, RECORDINGS_DIR, ACTIVE_UTTERANCES_FILE, BACKUP_DIR
     INTERFACE = RecordingInterface()
     PASSWORD = password
     IS_LOCAL_DEV = (password is None) or (backup_bucket is None)
+    data_root_dir = os.path.basename(cutset_file).split(".")[0]
+    RECORDINGS_DIR = RECORDINGS_DIR % data_root_dir
+    ACTIVE_UTTERANCES_FILE = ACTIVE_UTTERANCES_FILE % data_root_dir
+    BACKUP_DIR = Path(BACKUP_DIR % data_root_dir)
+    METADATA_FILE = METADATA_FILE % data_root_dir
+    os.makedirs(RECORDINGS_DIR, exist_ok=True)
 
-    args = dict(host="0.0.0.0", port=7861)
+    args = dict(host="0.0.0.0", port=port)
     if not IS_LOCAL_DEV:
         # don't back up locally to avoid overwriting prod data
         BackupThread(backup_bucket).start()

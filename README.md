@@ -85,11 +85,8 @@ openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -sha256 -days 3
 
 1. Configure systemd service that restarts the app in case it crashes:
 ```bash
-# edit service2.txt and set a password. Change the paths to uv and main.py if necessary
-sudo cp service2.txt /etc/systemd/system/alpine.service
-sudo systemctl daemon-reload
-sudo systemctl enable alpine
-sudo systemctl start alpine
+# edit install.py and set a password and add datasets. Change the paths to uv and main.py if necessary
+sudo uv run install.py
 ```
 
 1. The app should be running on port 7861. Navigate to `<YOUR INSTANCE IP>:7861` to check.
@@ -102,3 +99,6 @@ sudo journalctl -u alpine -f # get logs
 ```
 
 
+## Legal approval
+
+https://issues.amazon.com/issues/DMOPS-63225
