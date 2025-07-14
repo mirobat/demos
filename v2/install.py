@@ -22,7 +22,7 @@ WantedBy=multi-user.target
 """
 
 PASS="demo"
-for i, (lang, cutset) in enumerate([("en", "../cutset_eval_34080utt_10129NEs_31.3h_05_08_2025.jsonl.gz")]):
+for i, (lang, cutset) in enumerate([("en", "../output_cutset_en_6000_07112025.jsonl")]):
     port = 7862 + i # starting at a port that has not been used before
     content = TEMPLATE.format(**locals())
     with open(f"/etc/systemd/system/alpine{lang}.service", "w") as f:
