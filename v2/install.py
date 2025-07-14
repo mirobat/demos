@@ -22,11 +22,13 @@ WantedBy=multi-user.target
 """
 
 PASS="demo"
-for i, (lang, cutset) in enumerate([("en", "../output_cutset_en_6000_07112025.jsonl")]):
+for i, (lang, cutset) in enumerate([("en", "output_cutset_en_6000_07112025.jsonl")]):
     port = 7862 + i # starting at a port that has not been used before
     content = TEMPLATE.format(**locals())
+    cutset = os.path.abspath(cutset)
     with open(f"/etc/systemd/system/alpine{lang}.service", "w") as f:
         f.write(content)
     os.popen("sudo systemctl daemon-reload")
     os.popen(f"sudo systemctl enable alpine{lang}")
     os.popen(f"sudo systemctl start alpine{lang}")
+    os.popen(f"sudo systemctl restart alpine{lang}")
