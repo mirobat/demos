@@ -129,14 +129,14 @@ def load_cutset(cutset_path):
 
 
 def get_recorded_utterances():
-    return set(load_metadata().keys())
+    return set(line.replace('.wav', '') for line in load_metadata().keys())
 
 
 def get_active_utterances():
     if not os.path.exists(ACTIVE_UTTERANCES_FILE):
         return set()
     with open(ACTIVE_UTTERANCES_FILE, 'r') as f:
-        return set(line.strip() for line in f)
+        return set(line.strip().replace('.wav', '') for line in f)
 
 
 def add_active_utterance(utterance_id):
@@ -148,7 +148,8 @@ def add_active_utterance(utterance_id):
 def remove_active_utterance(utterance_id):
     with active_lock:
         active = get_active_utterances()
-        active.remove(utterance_id)
+        if utterance_id in active:
+            active.remove(utterance_id)
         with open(ACTIVE_UTTERANCES_FILE, 'w') as f:
             for uid in active:
                 f.write(f"{uid}\n")
@@ -158,24 +159,26 @@ def get_next_utterance(user) -> Optional[dict]:
     recorded = get_recorded_utterances()
     active = get_active_utterances()
 
-    available = [u for u in UTTERANCES
-                 if u['id'] not in recorded
-                 and u['id'] not in active]
+    # available = not already recorded (by anyone) and not currently being shown to anyone else
+    available = [u for u in UTTERANCES if u['id'] not in recorded and u['id'] not in active]
 
     if not available:
         return None
-    metadata = load_metadata()
-    # there will be many utterances for the same entity- make sure this user sees this entity once
-    entities_for_this_user = {m['entity_id'] for m in metadata.values() if m.get('user') == user}
-    if len(entities_for_this_user) == len(available):
-        # no more work left to do for this user
-        return None
-    utterance = random.choice(available)
-    entity_id = utterance['supervisions'][0]['custom']['NE_id']
-    while entity_id in entities_for_this_user:
-        utterance = random.choice(available)
-    add_active_utterance(utterance['id'])
-    return utterance
+
+    return random.choice(available)
+
+    # metadata = load_metadata()
+    # # there will be many utterances for the same entity- make sure this user sees this entity once
+    # entities_for_this_user = {m['entity_id'] for m in metadata.values() if m.get('user') == user}
+    # if entities_for_this_user == available:
+    #     # no more work left to do for this user
+    #     return None
+    # utterance = random.choice(available)
+    # entity_id = utterance['supervisions'][0]['custom']['NE_id']
+    # while entity_id in entities_for_this_user:
+    #     utterance = random.choice(available)
+    # add_active_utterance(utterance['id'])
+    # return utterance
 
 
 def save_recording(audio, utterance_id, utterance_data, **extras):
@@ -267,6 +270,7 @@ class RecordingInterface:
             next_ = get_next_utterance(user)
             if not next_:
                 # we're done recording
+                del self.current_utterance[user]
                 return NextUtterance.none(self.utterance_count[user])
             self.current_utterance[user] = next_
             return NextUtterance(self.current_utterance[user]['supervisions'][0]['text'], self.utterance_count[user])
