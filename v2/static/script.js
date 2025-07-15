@@ -10,6 +10,8 @@ document.addEventListener('alpine:init', () => {
         isLoading: false,
         isLoggedIn: false,
         username: '',
+        showThankYou: false,
+        showError: false,
         async init() {
             const storedUsername = localStorage.getItem('username');
             if (storedUsername && storedUsername.trim()) {
@@ -44,11 +46,23 @@ document.addEventListener('alpine:init', () => {
                     headers: headers
                 });
                 const data = await response.json();
-                this.sentence = data.sentence;
+                
+                if (data.status === 2) {
+                    this.sentence = null;
+                    this.showThankYou = true;
+                } else if (data.status === 1) {
+                    this.sentence = null;
+                    this.showError = true;
+                } else {
+                    this.sentence = data.sentence;
+                    this.showThankYou = false;
+                    this.showError = false;
+                }
                 this.recordedCount = data.count;
             } catch (error) {
                 console.error('Error fetching sentence:', error);
                 this.sentence = null;
+                this.showError = true;
             } finally {
                 this.isLoading = false;
             }
@@ -115,7 +129,14 @@ document.addEventListener('alpine:init', () => {
                 });
 
                 if (response.ok) {
-                    // alert('Recording uploaded successfully!');
+                    const data = await response.json();
+                    if (data.status === 2) {
+                        this.sentence = null;
+                        this.showThankYou = true;
+                    } else if (data.status === 1) {
+                        this.showError = true;
+                        alert('Error uploading recording');
+                    }
                     this.resetRecording();
                     await this.fetchSentence();
                 } else {

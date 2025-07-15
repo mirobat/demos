@@ -78,8 +78,11 @@
                     :disabled="isRecording">
                 </button>
             </div>
-            <div class="thank-you-message" x-show="!sentence">
+            <div class="thank-you-message" x-show="showThankYou">
                 Thank you, you've completed all tasks assigned to you.
+            </div>
+            <div class="error-message" x-show="showError">
+                An error occurred. Please try again or contact support.
             </div>
             <div class="recording-indicator" x-show="isRecording">
                 <span class="recording-dots"> </span>

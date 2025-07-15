@@ -14,6 +14,7 @@ import random
 import secrets
 import threading
 from collections import defaultdict
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from time import sleep
@@ -153,7 +154,7 @@ def remove_active_utterance(utterance_id):
                 f.write(f"{uid}\n")
 
 
-def get_next_utterance(user):
+def get_next_utterance(user) -> Optional[dict]:
     recorded = get_recorded_utterances()
     active = get_active_utterances()
 
@@ -192,6 +193,21 @@ def save_recording(audio, utterance_id, utterance_data, **extras):
     remove_active_utterance(utterance_id)
     return True
 
+@dataclass
+class NextUtterance:
+    text: Optional[str]
+    total_for_user: int
+    is_nothing: bool = False
+    is_error: bool = False
+
+    @classmethod
+    def none(cls, cnt):
+        return NextUtterance(None, cnt, is_nothing=True)
+
+    @classmethod
+    def error(cls, cnt):
+        return NextUtterance(None, cnt, is_error=True)
+
 
 class RecordingInterface:
     def __init__(self):
@@ -229,18 +245,17 @@ class RecordingInterface:
     def skip(self, request: Request):
         user = get_username_from_request(request)
         logger.info(f'Skipping for user {user}')
-        if self.current_utterance[user]:
-            remove_active_utterance(self.current_utterance[user]['id'])
-        self.current_utterance[user] = get_next_utterance(user)
-        if not self.current_utterance[user]:
-            return None
-        return self.current_utterance[user]['supervisions'][0]['text'], None, self.utterance_count[user]
+        next_ = get_next_utterance(user)
+        if next_:
+            if self.current_utterance[user]:
+                remove_active_utterance(self.current_utterance[user]['id'])
+            self.current_utterance[user] = next_
 
-    def save_and_next(self, audio, accent, request: Request):
+    def save_and_next(self, audio, accent, request: Request) -> NextUtterance:
         user = get_username_from_request(request)
         if audio is None:
             logger.info('skipping loop')
-            return self.current_utterance[user]['supervisions'][0]['text'], None, self.utterance_count[user]
+            return NextUtterance(self.current_utterance[user]['supervisions'][0]['text'], self.utterance_count[user])
         logger.info(f'Saving a file from user {user}')
         if not accent:
             accent = ""
@@ -249,18 +264,15 @@ class RecordingInterface:
             save_recording(audio, self.current_utterance[user]['id'], self.current_utterance[user], accent=accent,
                            user=user, recorded_at=now)
             self.utterance_count[user] += 1
-            self.current_utterance[user] = get_next_utterance(user)
-            if not self.current_utterance[user]:
-                return "No more utterances available.", None, self.utterance_count[user]
-            return self.current_utterance[user]['supervisions'][0]['text'], None, self.utterance_count[user]
-        logger.error(f"Got to a bad place, {user}, {self.current_utterance[user]}, {audio is None})")
-        return "Please record audio before saving.", None, self.utterance_count[user]  # TODO should never hit here
+            next_ = get_next_utterance(user)
+            if not next_:
+                # we're done recording
+                return NextUtterance.none(self.utterance_count[user])
+            self.current_utterance[user] = next_
+            return NextUtterance(self.current_utterance[user]['supervisions'][0]['text'], self.utterance_count[user])
 
-    def record_again(self, request: Request):
-        user = get_username_from_request(request)
-        if not self.current_utterance[user]:
-            return "No current utterance.", None, self.utterance_count[user]
-        return self.current_utterance[user]['supervisions'][0]['text'], None, self.utterance_count[user]
+        logger.error(f"Got to a bad place, {user}, {self.current_utterance[user]}, {audio is None})")
+        return NextUtterance.error(self.utterance_count[user])
 
 
 def load_metadata():
@@ -349,9 +361,15 @@ async def read_root(credentials: HTTPBasicCredentials = Depends(verify_credentia
 async def get_sentence(request: Request, skip: bool = False,
                        credentials: HTTPBasicCredentials = Depends(verify_credentials)):
     get_username_from_request(request)  # fail fast if not authenticated
-    if skip:
-        INTERFACE.skip(request)
-    return {"sentence": INTERFACE.get_text(request), "count": str(INTERFACE.get_recording_count(request))}
+    try:
+        if skip:
+            INTERFACE.skip(request)
+        sentence = INTERFACE.get_text(request)
+        # codes: 0=success, 1=unexpected error, 2=you're done
+        return {"sentence": sentence, "count": str(INTERFACE.get_recording_count(request)), "status": 0 if sentence else 2}
+    except Exception as e:
+        logger.error(f"Error in get_sentence: {e}")
+        return {"sentence": None, "count": "0", "status": 1}
 
 
 @app.post("/upload-audio")
@@ -361,15 +379,19 @@ async def upload_audio(request: Request, audio: UploadFile = File(...),
                        credentials: HTTPBasicCredentials = Depends(verify_credentials)
                        ):
     """Save the uploaded audio file."""
+    get_username_from_request(request)  # fail fast if not authenticated
     try:
-        get_username_from_request(request)  # fail fast if not authenticated
         content = await audio.read()
-        INTERFACE.save_and_next((content, int(sampleRate)), accent, request)
-        return {"message": "Audio uploaded successfully"}
+        result = INTERFACE.save_and_next((content, int(sampleRate)), accent, request)
+        if result.is_nothing:
+            return {"status": 2}
+        if result.is_error:
+            return {"message": "Error", "status": 1}
+        return {"status": 0}
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return {"error": str(e)}
+        return {"status": 1}
 
 
 if __name__ == "__main__":
