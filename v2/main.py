@@ -165,20 +165,18 @@ def get_next_utterance(user) -> Optional[dict]:
     if not available:
         return None
 
-    return random.choice(available)
+    metadata = load_metadata()
+    # there can be multiple utterances for the same entity- make sure this user sees this entity once
+    entities_for_this_user = {m['entity_id'] for m in metadata.values() if m.get('user') == user}
+    available_to_this_user = [x for x in available if
+                              x['supervisions'][0]['custom']['NE_id'] not in entities_for_this_user]
 
-    # metadata = load_metadata()
-    # # there will be many utterances for the same entity- make sure this user sees this entity once
-    # entities_for_this_user = {m['entity_id'] for m in metadata.values() if m.get('user') == user}
-    # if entities_for_this_user == available:
-    #     # no more work left to do for this user
-    #     return None
-    # utterance = random.choice(available)
-    # entity_id = utterance['supervisions'][0]['custom']['NE_id']
-    # while entity_id in entities_for_this_user:
-    #     utterance = random.choice(available)
-    # add_active_utterance(utterance['id'])
-    # return utterance
+    if not available_to_this_user:
+        # no more work left to do for this user
+        return None
+    utterance = random.choice(available)
+    add_active_utterance(utterance['id'])
+    return utterance
 
 
 def save_recording(audio, utterance_id, utterance_data, **extras):
