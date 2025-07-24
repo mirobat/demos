@@ -22,7 +22,10 @@ WantedBy=multi-user.target
 """
 
 PASS="demo"
-for i, (lang, cutset) in enumerate([("en", "output_cutset_en_6000_07112025.jsonl")]):
+for i, (lang, cutset) in enumerate([
+    ("en", "output_cutset_en_6000_07112025.jsonl"),
+    ("demo", "demo_cutset.jsonl"), # ignore the data here, it's just for showing the tool
+]):
     port = 7862 + i # starting at a port that has not been used before
     content = TEMPLATE.format(**locals())
     cutset = os.path.abspath(cutset)
