@@ -27,6 +27,7 @@ for i, (lang, cutset) in enumerate([
     ("demo", "demo_cutset.jsonl"), # ignore the data here, it's just for showing the tool
 ]):
     port = 7862 + i # starting at a port that has not been used before
+    print(f'installing cutset {cutset} on port {port}')
     content = TEMPLATE.format(**locals())
     cutset = os.path.abspath(cutset)
     with open(f"/etc/systemd/system/alpine{lang}.service", "w") as f:
